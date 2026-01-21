@@ -76,7 +76,8 @@ export default function RegisterPage() {
     }
 
     return (
-        <div className="w-full max-w-md space-y-8 rounded-2xl bg-white p-10 shadow-xl border border-slate-200 text-black">
+        <div
+            className="w-full max-w-md space-y-8 rounded-2xl bg-white px-10 py-7 shadow-xl border border-slate-200 text-black">
             <div className="text-center">
                 <h1 className="text-3xl font-bold text-blue-500">CryptoBroker</h1>
                 <p className="text-sm text-gray-500 mt-2">Demo account registration</p>
@@ -101,7 +102,7 @@ export default function RegisterPage() {
                             value={confirmPassword} onChange={setConfirmPassword}
                             isError={confirmPassword !== "" && !isMatch}
                         />
-                        <PasswordStrength password={password} />
+                        <PasswordStrength password={password}/>
                     </div>
                 </div>
 
@@ -113,6 +114,11 @@ export default function RegisterPage() {
                     Create Account
                 </button>
             </form>
+
+            <p className="text-center text-sm text-slate-500">
+                {"Do you have an account?"} <a href="/login"
+                    className="text-blue-500 font-semibold hover:underline">Login</a>
+            </p>
         </div>
     );
 }

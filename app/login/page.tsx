@@ -8,7 +8,7 @@ export default async function LoginPage(props: {
 
     return (
 
-            <div className="w-full max-w-md space-y-8 rounded-2xl bg-white p-10 shadow-xl border border-slate-200 text-black">
+            <div className="w-full max-w-md space-y-8 rounded-2xl bg-white px-10 py-7 shadow-xl border border-slate-200 text-black">
                 <div className="text-center">
                     <h1 className="text-3xl font-bold tracking-tight text-blue-500">CryptoBroker</h1>
                 </div>

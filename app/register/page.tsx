@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { signup, isEmailUnique } from '../auth/actions';
 import { FormInput } from './_components/FormInput';
 import { PasswordStrength } from './_components/PasswordStrength';
+import Link from "next/link";
 
 export default function RegisterPage() {
     const [email, setEmail] = useState('');
@@ -79,7 +80,8 @@ export default function RegisterPage() {
         <div
             className="w-full max-w-md space-y-8 rounded-2xl bg-white px-10 py-7 shadow-xl border border-slate-200 text-black">
             <div className="text-center">
-                <h1 className="text-3xl font-bold text-blue-500">CryptoBroker</h1>
+                <h1 className="text-3xl font-bold text-black">Crypto<span
+                    className="text-primary">Broker</span></h1>
                 <p className="text-sm text-gray-500 mt-2">Demo account registration</p>
             </div>
 
@@ -116,8 +118,8 @@ export default function RegisterPage() {
             </form>
 
             <p className="text-center text-sm text-slate-500">
-                {"Do you have an account?"} <a href="/login"
-                    className="text-blue-500 font-semibold hover:underline">Login</a>
+                {"Do you have an account?"} <Link href="/login"
+                    className="text-blue-500 font-semibold hover:underline">Login</Link>
             </p>
         </div>
     );

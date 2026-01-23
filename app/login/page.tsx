@@ -1,4 +1,5 @@
 import { login } from '../auth/actions'
+import Link from "next/link";
 
 export default async function LoginPage(props: {
     searchParams: Promise<{ error?: string }>
@@ -10,7 +11,8 @@ export default async function LoginPage(props: {
 
             <div className="w-full max-w-md space-y-8 rounded-2xl bg-white px-10 py-7 shadow-xl border border-slate-200 text-black">
                 <div className="text-center">
-                    <h1 className="text-3xl font-bold tracking-tight text-blue-500">CryptoBroker</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-black">Crypto<span
+                        className="text-primary">Broker</span></h1>
                 </div>
 
                 <form action={login} className="mt-8 space-y-10">
@@ -78,7 +80,7 @@ export default async function LoginPage(props: {
                 </form>
 
                 <p className="text-center text-sm text-slate-500">
-                    {"Don't have an account?"} <a href="/register" className="text-blue-500 font-semibold hover:underline">Register</a>
+                    {"Don't have an account?"} <Link href="/register" className="text-blue-500 font-semibold hover:underline">Register</Link>
                 </p>
             </div>
 

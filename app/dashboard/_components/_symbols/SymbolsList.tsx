@@ -1,25 +1,56 @@
 "use client"
+import { useState, useMemo } from "react";
 import Tabs from "@/app/_components/_tabs/Tabs";
+import { useQuery } from "@tanstack/react-query";
+import { getTicker } from "@/lib/binance";
+import SymbolItem from "./SymbolItem";
+import SymbolsSearch from "./SymbolsSearch";
 
 export default function SymbolsList() {
+    const [searchQuery, setSearchQuery] = useState("");
+
+    const { data, isLoading, error } = useQuery({
+        queryKey: ['binance-tickers'],
+        queryFn: getTicker,
+        refetchInterval: 30000,
+    });
+
+    const filteredData = useMemo(() => {
+        if (!data) return [];
+
+        const query = searchQuery.toUpperCase();
+
+        return data.filter((ticker: any) => {
+            const price = parseFloat(ticker.lastPrice);
+            const hasValue = price > 0;
+            const matchesSearch = ticker.symbol.includes(query);
+
+            return hasValue && matchesSearch;
+        })
+    }, [data, searchQuery]);
+
     return (
-        <div className="h-full flex-shrink-0 flex flex-col">
+        <div className="h-full flex-shrink-0 flex flex-col font-sans">
             <Tabs />
-            <div className="w-80 h-[calc(100vh-140px)] bg-card border border-border rounded-sm rounded-tl-none shadow-xl overflow-hidden">
-                <div className="p-3 border-b border-border/50">
-                    <div className="flex justify-between items-center text-[10px] text-slate-500 font-semibold uppercase">
-                        <span>Symbol</span>
-                        <span>Price</span>
-                        <span className="text-right">24h %</span>
+            <div className="w-80 h-[calc(100vh-140px)] bg-card border border-border rounded-sm rounded-tl-none shadow-xl overflow-hidden flex flex-col">
+                <SymbolsSearch value={searchQuery} onChange={setSearchQuery} />
+
+                <div className="p-3 border-b border-border/50 bg-background/50">
+                    <div className="flex justify-between items-center text-[10px] text-muted font-bold uppercase tracking-wider">
+                        <span className="w-1/3">Symbol</span>
+                        <span className="w-1/3 text-right">Price</span>
+                        <span className="w-1/3 text-right">24h %</span>
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar">
-                    <div className="p-8 text-center text-slate-600 text-xs">
-                        No assets found in this category
-                    </div>
+                <div className="overflow-y-auto flex-1 custom-scrollbar">
+                    <SymbolItem
+                        data={filteredData}
+                        isLoading={isLoading}
+                        error={error}
+                    />
                 </div>
             </div>
         </div>
-    )
+    );
 }

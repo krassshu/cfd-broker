@@ -1,7 +1,8 @@
-import { ChevronDownIcon } from "lucide-react";
+import {ChevronDownIcon, LogOut} from "lucide-react";
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import { Cog6ToothIcon } from "@heroicons/react/16/solid";
 import Link from "next/link";
+import {logout} from "@/app/auth/actions"
 
 export default function UserDropDown() {
     return (
@@ -28,12 +29,13 @@ export default function UserDropDown() {
 
                     <div className="h-[1px] bg-border my-1" />
 
-                    <button className="flex items-center w-full px-3 py-2 space-x-3 rounded-md cursor-pointer transition-colors hover:bg-red-500/10 text-red-500">
-                        <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                        <span className="text-sm font-medium">Logout</span>
-                    </button>
+                    <form action={logout}>
+                        <button type="submit"
+                                className="flex items-center w-full px-3 py-2 space-x-3 rounded-md cursor-pointer transition-colors hover:bg-red-500/10 text-red-500 outline-none">
+                            <LogOut className="size-4"/>
+                            <span className="text-sm font-medium">Logout</span>
+                        </button>
+                    </form>
                 </div>
             </PopoverPanel>
         </Popover>

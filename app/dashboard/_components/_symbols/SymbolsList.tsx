@@ -2,7 +2,7 @@
 import { useState, useMemo } from "react";
 import Tabs from "@/app/_components/_tabs/Tabs";
 import { useQuery } from "@tanstack/react-query";
-import { getTicker } from "@/lib/binance";
+import { getTicker, BinanceTicker } from "@/lib/binance";
 import SymbolItem from "./SymbolItem";
 import SymbolsSearch from "./SymbolsSearch";
 
@@ -17,16 +17,15 @@ export default function SymbolsList() {
 
     const filteredData = useMemo(() => {
         if (!data) return [];
-
         const query = searchQuery.toUpperCase();
 
-        return data.filter((ticker: any) => {
-            const price = parseFloat(ticker.lastPrice);
-            const hasValue = price > 0;
-            const matchesSearch = ticker.symbol.includes(query);
-
-            return hasValue && matchesSearch;
-        })
+        return data
+            .filter((ticker) => {
+                const price = parseFloat(ticker.lastPrice);
+                const matchesSearch = ticker.symbol.includes(query);
+                const hasValue = price > 0;
+                return matchesSearch && hasValue;
+            })
     }, [data, searchQuery]);
 
     return (
@@ -37,12 +36,11 @@ export default function SymbolsList() {
 
                 <div className="p-3 border-b border-border/50 bg-background/50">
                     <div className="flex justify-between items-center text-[10px] text-muted font-bold uppercase tracking-wider">
-                        <span className="w-1/3">Symbol</span>
-                        <span className="w-1/3 text-right">Price</span>
-                        <span className="w-1/3 text-right">24h %</span>
+                        <span className="w-1/3 text-slate-500">Symbol</span>
+                        <span className="w-1/3 text-right text-slate-500">Price</span>
+                        <span className="w-1/3 text-right text-slate-500">24h %</span>
                     </div>
                 </div>
-
                 <div className="overflow-y-auto flex-1 custom-scrollbar">
                     <SymbolItem
                         data={filteredData}

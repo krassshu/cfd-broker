@@ -5,12 +5,12 @@ export interface BinanceTicker{
     quoteVolume:string;
 }
 
-export async function getBinanceData():Promise<BinanceTicker[]>{
+export async function getBinanceData():Promise<BinanceTicker[]> {
     const response = await fetch('https://api.binance.com/api/v3/ticker/24hr');
 
-    if(!response.ok) throw new Error(response.statusText);
+    if (!response.ok) throw new Error(response.statusText);
 
-    return  await response.json();
+    return await response.json();
 }
 
 export async function getTicker():Promise<BinanceTicker[]>{

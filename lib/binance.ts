@@ -11,8 +11,8 @@ export async function getBinanceData():Promise<BinanceTicker[]>{
     if(!response.ok) throw new Error(response.statusText);
 
     return  await response.json();
-
 }
+
 export async function getTicker():Promise<BinanceTicker[]>{
     const data = await getBinanceData();
     return data.filter((ticker)=>ticker.symbol.endsWith("USDT")).map((ticker=>({

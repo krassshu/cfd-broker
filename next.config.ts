@@ -6,7 +6,16 @@ const nextConfig: NextConfig = {
     },
     images:{
         remotePatterns: [
-            new URL('https://bin.bnbstatic.com/static/assets/logos/**.png'),
+            {
+                protocol: 'https',
+                hostname: 'bin.bnbstatic.com',
+                pathname: '/static/assets/logos/**',
+            },
+            {
+                protocol: 'https',
+                hostname: 'static.binance.com',
+                pathname: '/sm/static/img/coins/**',
+            }
         ],
     }
 }

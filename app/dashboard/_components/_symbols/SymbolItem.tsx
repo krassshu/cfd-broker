@@ -27,14 +27,17 @@ export default function SymbolItem({ data, isLoading, error }: SymbolItemProps) 
                         className="flex items-center justify-between p-3 border-b border-border/30 hover:bg-muted/5 cursor-pointer transition-all duration-200 active:bg-muted/10 group"
                     >
                         <div className="flex items-center space-x-3 w-1/3">
-                            <div className="w-6 h-6 rounded-full bg-slate-900 border border-border overflow-hidden flex-shrink-0 relative">
+                            <div className="relative w-6 h-6 rounded-full bg-slate-900 border border-border overflow-hidden flex-shrink-0 relative">
                                 <Image
                                     src={`https://bin.bnbstatic.com/static/assets/logos/${cleanSymbol}.png`}
                                     alt={cleanSymbol}
                                     fill
-                                    onError={(e) => {
-                                        e.currentTarget.src = 'https://bin.bnbstatic.com/static/assets/logos/BTC.png';}}
+                                    sizes={"height: calc(var(--spacing) * 6); width: calc(var(--spacing) * 6);"}
                                     className="object-cover p-0.5"
+                                    onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.src = 'https://bin.bnbstatic.com/static/assets/logos/BTC.png';
+                                    }}
                                 />
                             </div>
                             <div className="flex flex-col">

@@ -1,4 +1,4 @@
-import Chart from "@/app/dashboard/_components/_primaryContent/_chart/Chart";
+import Chart from "@/app/market/_components/_primaryContent/_chart/Chart";
 
 export default function PrimaryContent(){
     return(

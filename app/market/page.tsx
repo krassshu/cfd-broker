@@ -1,5 +1,5 @@
-import SymbolsList from "@/app/dashboard/_components/_symbols/SymbolsList";
-import PrimaryContent from "@/app/dashboard/_components/_primaryContent/PrimaryContent";
+import SymbolsList from "@/app/market/_components/_symbols/SymbolsList";
+import PrimaryContent from "@/app/market/_components/_primaryContent/PrimaryContent";
 
 export default function DashboardPage() {
     return(

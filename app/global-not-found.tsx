@@ -58,7 +58,7 @@ export default function NotFound() {
                     </p>
                 </div>
 
-                <Link href="/dashboard"
+                <a href="/market"
                       className="group relative inline-flex items-center justify-center overflow-hidden rounded-xl bg-blue-600 px-8 py-4 font-bold text-white transition-all duration-300 hover:scale-105 hover:shadow-[0_0_30px_rgba(37,99,235,0.6)] active:scale-95">
                   <span className="relative z-10 flex items-center gap-2">
                     Return to Market
@@ -69,7 +69,7 @@ export default function NotFound() {
                     </svg>
                   </span>
                     <div className="absolute inset-0 -z-10 bg-gradient-to-r from-blue-600 to-blue-500 transition-opacity duration-300 group-hover:opacity-90"/>
-                </Link>
+                </a>
             </div>
             <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-slate-950 to-transparent -z-10" />
         </div>

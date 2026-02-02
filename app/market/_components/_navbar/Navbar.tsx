@@ -1,5 +1,5 @@
 import { SwitchTheme } from "@/app/_components/_switchTheme/SwitchTheme";
-import UserDropDown from "@/app/dashboard/_components/_navbar/_userDropDown/UserDropDown";
+import UserDropDown from "@/app/market/_components/_navbar/_userDropDown/UserDropDown";
 
 export default function Navbar() {
     return (

@@ -2,19 +2,14 @@
 import { createChart, ColorType, IChartApi, ISeriesApi } from 'lightweight-charts';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import ChartsToolbar from "@/app/dashboard/_components/_primaryContent/_chart/ChartsToolbar";
+import { getKlines } from "@/lib/binance";
+import ChartsToolbar from "@/app/market/_components/_primaryContent/_chart/ChartsToolbar";
+import {useMarketStore} from "@/lib/store";
 
-const fetchKlines = async (interval: string) => {
-
-    await new Promise(r => setTimeout(r, 500));
-
-    const basePrice = interval === '1h' ? 97000 : 50000;
-    return [
-        { time: '2025-01-20', open: basePrice, high: basePrice + 2000, low: basePrice - 500, close: basePrice + 1000 },
-        { time: '2025-01-21', open: basePrice + 1000, high: basePrice + 3000, low: basePrice, close: basePrice + 2500 },
-        { time: '2025-01-22', open: basePrice + 2500, high: basePrice + 6000, low: basePrice + 2000, close: basePrice + 5000 },
-    ];
-};
+interface CryptoData {
+    symbols: string;
+    changePercent:string;
+}
 
 export default function Chart() {
     const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -22,11 +17,11 @@ export default function Chart() {
     const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
 
     const [activeInterval, setActiveInterval] = useState('1h');
-
+    const activeSymbol = useMarketStore((state) => state.activeSymbol);
     const { data, isLoading } = useQuery({
-        queryKey: ['klines', 'BTCUSDT', activeInterval],
-        queryFn: () => fetchKlines(activeInterval),
-        staleTime: 1000 * 30,
+        queryKey: ['klines', activeSymbol, activeInterval],
+        queryFn: () => getKlines(activeSymbol, activeInterval),
+        staleTime: Infinity,
     });
 
     useEffect(() => {
@@ -42,12 +37,25 @@ export default function Chart() {
                 vertLines: { color: 'rgba(51, 65, 85, 0.3)' },
                 horzLines: { color: 'rgba(51, 65, 85, 0.3)' },
             },
+            crosshair: {
+                mode: 0,
+                vertLine: {
+                    labelBackgroundColor: '#1e293b',
+                },
+                horzLine: {
+                    labelBackgroundColor: '#1e293b',
+                },
+            },
             width: chartContainerRef.current.clientWidth,
             height: chartContainerRef.current.clientHeight,
             timeScale: {
                 timeVisible: true,
                 secondsVisible: false,
-            }
+                borderColor: 'rgba(148, 163, 184, 0.2)',
+            },
+            rightPriceScale: {
+                borderColor: 'rgba(148, 163, 184, 0.2)',
+            },
         });
 
         const series = chart.addCandlestickSeries({
@@ -64,9 +72,9 @@ export default function Chart() {
         const resizeObserver = new ResizeObserver((entries) => {
             if (entries.length === 0) return;
             window.requestAnimationFrame(() => {
-                const { width, height } = entries[0].contentRect;
-                if (width > 0 && height > 0) {
-                    chart.resize(width, height);
+                if (chartRef.current) {
+                    const { width, height } = entries[0].contentRect;
+                    chartRef.current.resize(width, height);
                 }
             });
         });
@@ -82,9 +90,49 @@ export default function Chart() {
     useEffect(() => {
         if (seriesRef.current && data) {
             seriesRef.current.setData(data);
-            chartRef.current?.timeScale().fitContent();
         }
     }, [data]);
+
+    useEffect(() => {
+        if (!data || !seriesRef.current || !activeSymbol) return;
+
+        const wsSymbol = activeSymbol.toLowerCase();
+        const wsInterval = activeInterval;
+
+        const url = `wss://stream.binance.com:9443/ws/${wsSymbol}@kline_${wsInterval}`;
+        
+        const ws = new WebSocket(url);
+
+        ws.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+
+            if (!message.k) return;
+
+            const candle = message.k;
+
+            const liveCandle = {
+                time: candle.t / 1000,
+                open: parseFloat(candle.o),
+                high: parseFloat(candle.h),
+                low: parseFloat(candle.l),
+                close: parseFloat(candle.c),
+            };
+
+            if (seriesRef.current) {
+                seriesRef.current.update(liveCandle);
+            }
+        };
+
+        ws.onerror = (err) => {
+            if (ws.readyState !== WebSocket.CLOSED) {
+            }
+        };
+
+        return () => {
+            ws.close();
+        };
+
+    }, [activeInterval, data]);
 
     return (
         <div className="flex flex-col w-full h-full min-w-0 bg-card overflow-hidden">
@@ -93,9 +141,9 @@ export default function Chart() {
                 setActiveInterval={setActiveInterval}
             />
             <div className="relative flex-1 min-h-0">
-                {isLoading && (
+                {isLoading && !data && (
                     <div className="absolute inset-0 z-10 flex items-center justify-center bg-card/50 backdrop-blur-sm">
-                        <div className="text-primary text-sm animate-pulse">Loading candles...</div>
+                        <div className="text-primary text-sm animate-pulse">Loading market data...</div>
                     </div>
                 )}
                 <div ref={chartContainerRef} className="w-full h-full" />

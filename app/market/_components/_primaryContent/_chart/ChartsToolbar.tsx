@@ -1,12 +1,14 @@
+import {useMarketStore} from "@/lib/store";
+
 interface Props {
     activeInterval: string;
     setActiveInterval: (val: string) => void;
 }
 
 export default function ChartsToolbar({ activeInterval, setActiveInterval }: Props) {
-    const symbol = "BTC/USDT";
-    const changePercent = 2.45;
-    const isPositive = changePercent >= 0;
+    const {activeSymbol, priceChangePercent} = useMarketStore();
+    const displaySymbol = activeSymbol.replace("USDT", "/USDT");
+    const isPositive = priceChangePercent >= 0;
 
     const intervals = ['1m', '5m', '15m', '1h', '4h', '1d'];
 
@@ -14,9 +16,9 @@ export default function ChartsToolbar({ activeInterval, setActiveInterval }: Pro
         <div className="flex items-center justify-between px-4 py-2 border-b border-border/50 bg-card/50">
             <div className="flex items-center gap-4">
                 <div className="flex flex-col leading-tight">
-                    <span className="text-sm font-bold text-foreground">{symbol}</span>
+                    <span className="text-sm font-bold text-foreground">{displaySymbol}</span>
                     <span className={`text-[10px] font-bold ${isPositive ? 'text-up' : 'text-down'}`}>
-                        {isPositive ? '▲' : '▼'} {isPositive ? '+' : ''}{changePercent}%
+                        {isPositive ? '▲' : '▼'} {isPositive ? '+' : ''}{priceChangePercent.toFixed(2)}%
                     </span>
                 </div>
 

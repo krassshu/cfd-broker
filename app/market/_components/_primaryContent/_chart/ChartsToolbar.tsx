@@ -1,4 +1,6 @@
-import {useMarketStore} from "@/lib/store";
+"use client"
+import { useMarketStore } from "@/lib/store";
+import OrderPanel from "./OrderPanel";
 
 interface Props {
     activeInterval: string;
@@ -6,16 +8,16 @@ interface Props {
 }
 
 export default function ChartsToolbar({ activeInterval, setActiveInterval }: Props) {
-    const {activeSymbol, priceChangePercent} = useMarketStore();
+    const { activeSymbol, priceChangePercent } = useMarketStore();
+
     const displaySymbol = activeSymbol.replace("USDT", "/USDT");
     const isPositive = priceChangePercent >= 0;
-
     const intervals = ['1m', '5m', '15m', '1h', '4h', '1d'];
 
     return (
-        <div className="flex items-center justify-between px-4 py-2 border-b border-border/50 bg-card/50">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-border/50 bg-card/50 h-14 shrink-0">
             <div className="flex items-center gap-4">
-                <div className="flex flex-col leading-tight">
+                <div className="flex flex-col leading-tight min-w-[80px]">
                     <span className="text-sm font-bold text-foreground">{displaySymbol}</span>
                     <span className={`text-[10px] font-bold ${isPositive ? 'text-up' : 'text-down'}`}>
                         {isPositive ? '▲' : '▼'} {isPositive ? '+' : ''}{priceChangePercent.toFixed(2)}%
@@ -38,6 +40,7 @@ export default function ChartsToolbar({ activeInterval, setActiveInterval }: Pro
                     ))}
                 </div>
             </div>
+            <OrderPanel />
         </div>
     );
 }

@@ -1,15 +1,11 @@
 "use client"
-import { createChart, ColorType, IChartApi, ISeriesApi } from 'lightweight-charts';
+import { createChart, ColorType, IChartApi, ISeriesApi, CandlestickData, UTCTimestamp } from 'lightweight-charts';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getKlines } from "@/lib/binance";
 import ChartsToolbar from "@/app/market/_components/_primaryContent/_chart/ChartsToolbar";
-import {useMarketStore} from "@/lib/store";
-
-interface CryptoData {
-    symbols: string;
-    changePercent:string;
-}
+import { useMarketStore } from "@/lib/store";
+import { SPREAD_RATE } from "@/lib/trading-math";
 
 export default function Chart() {
     const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -18,9 +14,13 @@ export default function Chart() {
 
     const [activeInterval, setActiveInterval] = useState('1h');
     const activeSymbol = useMarketStore((state) => state.activeSymbol);
-    const { data, isLoading } = useQuery({
+
+    const { data, isLoading } = useQuery<CandlestickData[]>({
         queryKey: ['klines', activeSymbol, activeInterval],
-        queryFn: () => getKlines(activeSymbol, activeInterval),
+        queryFn: async () => {
+            const result = await getKlines(activeSymbol, activeInterval);
+            return result as unknown as CandlestickData[];
+        },
         staleTime: Infinity,
     });
 
@@ -39,12 +39,8 @@ export default function Chart() {
             },
             crosshair: {
                 mode: 0,
-                vertLine: {
-                    labelBackgroundColor: '#1e293b',
-                },
-                horzLine: {
-                    labelBackgroundColor: '#1e293b',
-                },
+                vertLine: { labelBackgroundColor: '#1e293b' },
+                horzLine: { labelBackgroundColor: '#1e293b' },
             },
             width: chartContainerRef.current.clientWidth,
             height: chartContainerRef.current.clientHeight,
@@ -55,10 +51,11 @@ export default function Chart() {
             },
             rightPriceScale: {
                 borderColor: 'rgba(148, 163, 184, 0.2)',
+                autoScale: true,
             },
         });
 
-        const series = chart.addCandlestickSeries({
+        seriesRef.current = chart.addCandlestickSeries({
             upColor: '#22c55e',
             downColor: '#ef4444',
             borderVisible: false,
@@ -66,7 +63,6 @@ export default function Chart() {
             wickDownColor: '#ef4444',
         });
 
-        seriesRef.current = series;
         chartRef.current = chart;
 
         const resizeObserver = new ResizeObserver((entries) => {
@@ -88,8 +84,31 @@ export default function Chart() {
     }, []);
 
     useEffect(() => {
-        if (seriesRef.current && data) {
+        if (seriesRef.current && data && data.length > 0) {
+
+            const firstPrice = data[data.length - 1].close;
+            let precision = 2;
+            let minMove = 0.01;
+
+            if (firstPrice < 1) {
+                precision = 8;
+                minMove = 0.00000001;
+            } else if (firstPrice < 50) {
+                precision = 4;
+                minMove = 0.0001;
+            }
+
+            seriesRef.current.applyOptions({
+                priceFormat: {
+                    type: 'price',
+                    precision: precision,
+                    minMove: minMove,
+                },
+            });
+
             seriesRef.current.setData(data);
+
+            chartRef.current?.timeScale().fitContent();
         }
     }, [data]);
 
@@ -97,25 +116,25 @@ export default function Chart() {
         if (!data || !seriesRef.current || !activeSymbol) return;
 
         const wsSymbol = activeSymbol.toLowerCase();
-        const wsInterval = activeInterval;
 
-        const url = `wss://stream.binance.com:9443/ws/${wsSymbol}@kline_${wsInterval}`;
-        
+        const url = `wss://stream.binance.com:9443/ws/${wsSymbol}@kline_${activeInterval}`;
+        console.log("Connecting WS:", url);
+
         const ws = new WebSocket(url);
 
         ws.onmessage = (event) => {
             const message = JSON.parse(event.data);
-
             if (!message.k) return;
-
             const candle = message.k;
 
+            const multiplier = 1 - SPREAD_RATE;
+
             const liveCandle = {
-                time: candle.t / 1000,
-                open: parseFloat(candle.o),
-                high: parseFloat(candle.h),
-                low: parseFloat(candle.l),
-                close: parseFloat(candle.c),
+                time: (candle.t / 1000) as UTCTimestamp,
+                open: parseFloat(candle.o) * multiplier,
+                high: parseFloat(candle.h) * multiplier,
+                low: parseFloat(candle.l) * multiplier,
+                close: parseFloat(candle.c) * multiplier,
             };
 
             if (seriesRef.current) {
@@ -125,6 +144,7 @@ export default function Chart() {
 
         ws.onerror = (err) => {
             if (ws.readyState !== WebSocket.CLOSED) {
+                console.error("WS Error", err);
             }
         };
 
@@ -132,7 +152,7 @@ export default function Chart() {
             ws.close();
         };
 
-    }, [activeInterval, data]);
+    }, [activeInterval, data, activeSymbol]);
 
     return (
         <div className="flex flex-col w-full h-full min-w-0 bg-card overflow-hidden">

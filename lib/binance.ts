@@ -1,3 +1,5 @@
+import { SPREAD_RATE } from "@/lib/trading-math";
+
 export interface BinanceTicker{
     symbol: string;
     lastPrice: string;
@@ -40,12 +42,13 @@ export async function getKlines(symbol: string, interval: string): Promise<Candl
     if (!response.ok) throw new Error('Failed to fetch klines');
 
     const data = await response.json();
+    const multiplier = 1 - SPREAD_RATE;
 
     return data.map((k: any[]) => ({
         time: k[0] / 1000,
-        open: parseFloat(k[1]),
-        high: parseFloat(k[2]),
-        low: parseFloat(k[3]),
-        close: parseFloat(k[4]),
+        open: parseFloat(k[1]) * multiplier,
+        high: parseFloat(k[2]) * multiplier,
+        low: parseFloat(k[3]) * multiplier,
+        close: parseFloat(k[4]) * multiplier,
     }));
 }

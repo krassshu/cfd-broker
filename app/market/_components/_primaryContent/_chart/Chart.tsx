@@ -12,14 +12,17 @@ export default function Chart() {
     const chartRef = useRef<IChartApi | null>(null);
     const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
 
+    const lastCandleRef = useRef<CandlestickData | null>(null);
+
     const [activeInterval, setActiveInterval] = useState('1h');
-    const activeSymbol = useMarketStore((state) => state.activeSymbol);
+
+    const { activeSymbol, currentPrice } = useMarketStore();
 
     const { data, isLoading } = useQuery<CandlestickData[]>({
         queryKey: ['klines', activeSymbol, activeInterval],
         queryFn: async () => {
-            const result = await getKlines(activeSymbol, activeInterval);
-            return result as unknown as CandlestickData[];
+            const rawData = await getKlines(activeSymbol, activeInterval);
+            return rawData as unknown as CandlestickData[];
         },
         staleTime: Infinity,
     });
@@ -48,6 +51,8 @@ export default function Chart() {
                 timeVisible: true,
                 secondsVisible: false,
                 borderColor: 'rgba(148, 163, 184, 0.2)',
+                shiftVisibleRangeOnNewBar: true,
+                fixLeftEdge: true,
             },
             rightPriceScale: {
                 borderColor: 'rgba(148, 163, 184, 0.2)',
@@ -85,7 +90,6 @@ export default function Chart() {
 
     useEffect(() => {
         if (seriesRef.current && data && data.length > 0) {
-
             const firstPrice = data[data.length - 1].close;
             let precision = 2;
             let minMove = 0.01;
@@ -99,26 +103,25 @@ export default function Chart() {
             }
 
             seriesRef.current.applyOptions({
-                priceFormat: {
-                    type: 'price',
-                    precision: precision,
-                    minMove: minMove,
-                },
+                priceFormat: { type: 'price', precision, minMove },
             });
 
             seriesRef.current.setData(data);
 
-            chartRef.current?.timeScale().fitContent();
+            lastCandleRef.current = data[data.length - 1];
+            const totalBars = data.length;
+            chartRef.current?.timeScale().setVisibleLogicalRange({
+                from: totalBars - 100,
+                to: totalBars,
+            });
         }
     }, [data]);
 
     useEffect(() => {
-        if (!data || !seriesRef.current || !activeSymbol) return;
+        if (!seriesRef.current || !activeSymbol) return;
 
         const wsSymbol = activeSymbol.toLowerCase();
-
-        const url = `wss://stream.binance.com:9443/ws/${wsSymbol}@kline_${activeInterval}`;
-        console.log("Connecting WS:", url);
+        const url = `wss://stream.binance.com/ws/${wsSymbol}@kline_${activeInterval}`;
 
         const ws = new WebSocket(url);
 
@@ -126,7 +129,6 @@ export default function Chart() {
             const message = JSON.parse(event.data);
             if (!message.k) return;
             const candle = message.k;
-
             const multiplier = 1 - SPREAD_RATE;
 
             const liveCandle = {
@@ -137,22 +139,35 @@ export default function Chart() {
                 close: parseFloat(candle.c) * multiplier,
             };
 
+            lastCandleRef.current = liveCandle;
+
             if (seriesRef.current) {
                 seriesRef.current.update(liveCandle);
-            }
-        };
-
-        ws.onerror = (err) => {
-            if (ws.readyState !== WebSocket.CLOSED) {
-                console.error("WS Error", err);
             }
         };
 
         return () => {
             ws.close();
         };
+    }, [activeInterval, activeSymbol]);
 
-    }, [activeInterval, data, activeSymbol]);
+    useEffect(() => {
+        if (!seriesRef.current || !lastCandleRef.current || currentPrice === 0) return;
+
+        const spreadPrice = currentPrice * (1 - SPREAD_RATE);
+        const currentCandle = lastCandleRef.current;
+
+        const updatedCandle = {
+            ...currentCandle,
+            close: spreadPrice,
+            high: Math.max(currentCandle.high, spreadPrice),
+            low: Math.min(currentCandle.low, spreadPrice),
+        };
+
+        lastCandleRef.current = updatedCandle;
+        seriesRef.current.update(updatedCandle);
+
+    }, [currentPrice]);
 
     return (
         <div className="flex flex-col w-full h-full min-w-0 bg-card overflow-hidden">

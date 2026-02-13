@@ -14,8 +14,8 @@ export interface CandlestickData {
     close: number;
 }
 
-export async function getBinanceData():Promise<BinanceTicker[]> {
-    const response = await fetch('https://api.binance.com/api/v3/ticker/24hr');
+export async function getBinanceData(): Promise<BinanceTicker[]> {
+    const response = await fetch('/api/binance/ticker');
 
     if (!response.ok) throw new Error(response.statusText);
 

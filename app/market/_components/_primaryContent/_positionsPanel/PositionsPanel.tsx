@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { createBrowserClient } from '@supabase/ssr'
 import { useQueryClient } from "@tanstack/react-query";
 import { BinanceTicker } from "@/lib/binance";
-import { closePosition, updateOrder } from "@/app/actions/trade";
+import { closePosition, updateOrder } from "@/app/actions/trade/trade";
 import { toast } from "sonner";
 import { PositionsTabs } from "./PositionsTabs";
 import { PositionsTable } from "./PositionsTable";

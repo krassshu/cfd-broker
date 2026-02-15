@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createBrowserClient } from '@supabase/ssr'
 import { useMarketStore, Position, Favorite } from "@/lib/store";
-import { closePosition } from "@/app/actions/trade";
+import { closePosition } from "@/app/actions/trade/trade";
 import { toast } from "sonner";
 
 export default function AccountManager() {

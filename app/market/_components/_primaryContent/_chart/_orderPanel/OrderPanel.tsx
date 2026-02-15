@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useMarketStore } from "@/lib/store";
 import { calculateExecutionPrice, LEVERAGE } from "@/lib/trading-math";
-import { executeTrade } from "@/app/actions/trade";
+import { executeTrade } from "@/app/actions/trade/trade";
 import { TradeButton } from "./TradeButton";
 import { QuantitySelector } from "./QuantitySelector";
 import { toast } from "sonner";

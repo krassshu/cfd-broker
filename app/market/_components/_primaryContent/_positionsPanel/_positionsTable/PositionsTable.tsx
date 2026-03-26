@@ -1,77 +1,63 @@
 "use client";
+
+import { Order } from "@/app/market/_components/_primaryContent/_positionsPanel/types";
 import { PositionRow } from "./PositionRow";
-import {PositionsTableProps} from "@/app/market/_components/_primaryContent/_positionsPanel/types";
+import PositionsTableSkeleton from "./PositionsTableSkeleton";
+import { BinanceTicker } from "@/lib/binance";
 
-export function PositionsTable({ orders, activeTab, tickersData, onClose, onEdit }: PositionsTableProps){
-    const visibleOrders = orders
-        .filter(o => activeTab === 'OPEN' ? o.status === 'OPEN' : o.status === 'CLOSED')
-        .sort((a, b) => {
-            if (activeTab === 'HISTORY') {
-                const dateA = a.closed_at ? new Date(a.closed_at).getTime() : 0;
-                const dateB = b.closed_at ? new Date(b.closed_at).getTime() : 0;
-                return dateB - dateA;
-            } else {
-                const dateA = new Date(a.created_at).getTime();
-                const dateB = new Date(b.created_at).getTime();
-                return dateB - dateA;
-            }
-        });
+interface PositionsTableProps {
+    orders: Order[];
+    activeTab: 'OPEN' | 'HISTORY';
+    tickersData?: BinanceTicker[];
+    isLoading?: boolean;
+    onClose: (id: string, symbol: string) => void;
+    onEdit: (id: string) => void;
+}
 
+export const PositionsTable = ({ orders, activeTab, tickersData, isLoading, onClose, onEdit }: PositionsTableProps) => {
     return (
         <div className="flex-1 overflow-auto custom-scrollbar">
-            <table className="w-full text-left border-collapse min-w-[1000px]">
-                <thead className="sticky top-0 bg-card z-10 text-[10px] text-muted uppercase font-bold tracking-wider shadow-sm border-b border-border">
-                {activeTab === 'HISTORY' ? (
-                    <tr>
-                        <th className="px-4 py-3">Symbol</th>
-                        <th className="px-4 py-3 text-right">Order Price</th>
-                        <th className="px-4 py-3 text-right">Close Price</th>
-                        <th className="px-4 py-3 text-center">Direction</th>
-                        <th className="px-4 py-3 text-right">Amount</th>
-                        <th className="px-4 py-3 text-right">Mkt Value</th>
-                        <th className="px-4 py-3 text-right">Total P/L</th>
-                        <th className="px-4 py-3 text-right">SL</th>
-                        <th className="px-4 py-3 text-right">TP</th>
-                        <th className="px-4 py-3 text-right">Order Date</th>
-                        <th className="px-4 py-3 text-right">Close Date</th>
-                    </tr>
-                ) : (
-                    <tr>
-                        <th className="px-4 py-3">Symbol</th>
-                        <th className="px-4 py-3 text-center">Direction</th>
-                        <th className="px-4 py-3 text-right">Open Price</th>
-                        <th className="px-4 py-3 text-right">Amount</th>
-                        <th className="px-4 py-3 text-right">Mkt Price</th>
-                        <th className="px-4 py-3 text-right">Total P/L</th>
-                        <th className="px-4 py-3 text-right">Mkt Value</th>
-                        <th className="px-4 py-3 text-right">SL</th>
-                        <th className="px-4 py-3 text-right">TP</th>
-                        <th className="px-4 py-3 text-right">Open Date</th>
-                        <th className="px-4 py-3 text-center w-24"></th>
-                    </tr>
-                )}
+            <table className="w-full min-w-[800px] text-left border-collapse">
+                <thead className="sticky top-0 z-10 bg-card/95 backdrop-blur-sm text-[10px] font-bold text-muted uppercase tracking-wider border-b border-border/50">
+                <tr>
+                    <th className="px-4 py-3">Symbol</th>
+                    <th className="px-4 py-3 text-center">Direction</th>
+                    <th className="px-4 py-3 text-right">Open Price</th>
+                    <th className="px-4 py-3 text-right">Amount</th>
+                    <th className="px-4 py-3 text-right">Mkt Price</th>
+                    <th className="px-4 py-3 text-right">Total P/L</th>
+                    <th className="px-4 py-3 text-right">Mkt Value</th>
+                    <th className="px-4 py-3 text-right">SL</th>
+                    <th className="px-4 py-3 text-right">TP</th>
+                    <th className="px-4 py-3 text-right">
+                        {activeTab === 'OPEN' ? 'Open Date' : 'Closed Date'}
+                    </th>
+                    <th className="px-4 py-3 text-center w-[80px]">Actions</th>
+                </tr>
                 </thead>
-                <tbody className="divide-y divide-border/30 text-xs">
-                {visibleOrders.map((order) => (
-                    <PositionRow
-                        key={order.id}
-                        order={order}
-                        activeTab={activeTab}
-                        tickersData={tickersData}
-                        onClose={onClose}
-                        onEdit={onEdit}
-                    />
-                ))}
-
-                {visibleOrders.length === 0 && (
+                <tbody className="divide-y divide-border/30">
+                {isLoading ? (
+                    <PositionsTableSkeleton />
+                ) : orders.length === 0 ? (
                     <tr>
-                        <td colSpan={11} className="px-4 py-12 text-center text-muted italic">
-                            No {activeTab.toLowerCase()} positions found
+                        <td colSpan={11} className="text-center py-12 text-muted text-xs">
+                            No {activeTab.toLowerCase()} positions
                         </td>
                     </tr>
+                ) : (
+                    orders.map((order) => (
+                        <PositionRow
+                            key={order.id}
+                            order={order}
+                            activeTab={activeTab}
+                            tickersData={tickersData}
+                            onClose={onClose}
+                            onEdit={onEdit}
+                        />
+                    ))
                 )}
                 </tbody>
             </table>
         </div>
     );
-}
+};

@@ -1,5 +1,4 @@
-export const SPREAD_RATE = 0.001;
-export const LEVERAGE = 50;
+import { SPREAD_RATE, LEVERAGE, type TradeSide } from './config';
 
 export interface TradeCalculation {
     originalPrice: number;
@@ -10,8 +9,8 @@ export interface TradeCalculation {
     liquidationPrice: number;
 }
 
-export function calculateLiquidationPrice(entryPrice: number, side: 'BUY' | 'SELL', leverage: number): number {
-
+/** Returns the price at which a position gets liquidated based on leverage */
+export function calculateLiquidationPrice(entryPrice: number, side: TradeSide, leverage: number = LEVERAGE): number {
     const maintenanceMargin = 1 / leverage;
 
     if (side === 'BUY') {
@@ -21,15 +20,12 @@ export function calculateLiquidationPrice(entryPrice: number, side: 'BUY' | 'SEL
     }
 }
 
-export function calculateExecutionPrice(price: number, side: 'BUY' | 'SELL', amount: number): TradeCalculation {
+/** Applies spread to market price and computes margin, cost, and liquidation for a new trade */
+export function calculateExecutionPrice(price: number, side: TradeSide, amount: number): TradeCalculation {
     const spreadAmount = price * SPREAD_RATE;
-    let executionPrice = 0;
-
-    if (side === 'BUY') {
-        executionPrice = price + spreadAmount;
-    } else {
-        executionPrice = price - spreadAmount;
-    }
+    const executionPrice = side === 'BUY'
+        ? price + spreadAmount
+        : price - spreadAmount;
 
     const totalCost = executionPrice * amount;
     const requiredMargin = totalCost / LEVERAGE;
@@ -44,3 +40,67 @@ export function calculateExecutionPrice(price: number, side: 'BUY' | 'SELL', amo
         liquidationPrice: Number(liquidationPrice.toFixed(8))
     };
 }
+
+/** Computes unrealized P&L for a single position */
+export function calculatePositionPnL(
+    side: TradeSide,
+    entryPrice: number,
+    currentPrice: number,
+    amount: number
+): number {
+    if (side === 'BUY') {
+        return (currentPrice - entryPrice) * amount;
+    } else {
+        return (entryPrice - currentPrice) * amount;
+    }
+}
+
+/** Returns margin locked by a position (notional value / leverage) */
+export function calculatePositionMargin(entryPrice: number, amount: number, leverage: number = LEVERAGE): number {
+    return (entryPrice * amount) / leverage;
+}
+
+export function calculateClosePriceFromPnL(
+    side: TradeSide,
+    entryPrice: number,
+    amount: number,
+    targetPnL: number
+): number {
+    if (amount === 0) return 0;
+    if (side === 'BUY') {
+        return entryPrice + (targetPnL / amount);
+    } else {
+        return entryPrice - (targetPnL / amount);
+    }
+}
+
+/** Calculate SL/TP price range limits. Returns { min, max } for the allowed price. */
+export function calculateSlPriceLimits(
+    side: TradeSide,
+    entryPrice: number,
+    currentPrice: number,
+    liquidationPrice: number
+): { min: number; max: number } {
+    if (side === 'BUY') {
+        // BUY SL: must be above liquidation and below current price
+        return { min: liquidationPrice, max: currentPrice };
+    } else {
+        // SELL SL: must be below liquidation and above current price
+        return { min: currentPrice, max: liquidationPrice };
+    }
+}
+
+export function calculateTpPriceLimits(
+    side: TradeSide,
+    entryPrice: number,
+    currentPrice: number
+): { min: number; max: number } {
+    if (side === 'BUY') {
+        // BUY TP: must be above current price, no upper limit (use 10x entry as reasonable max)
+        return { min: currentPrice, max: entryPrice * 10 };
+    } else {
+        // SELL TP: must be below current price, floor at 0
+        return { min: 0.00000001, max: currentPrice };
+    }
+}
+

@@ -1,10 +1,10 @@
 "use client"
 import { memo } from "react";
-import Image from "next/image";
 import { useMarketStore } from "@/lib/store";
-import { SPREAD_RATE } from "@/lib/trading-math";
+import CryptoIcon from "@/app/market/_components/_shared/CryptoIcon";
+import { SPREAD_RATE } from "@/lib/config";
 import { Star } from "lucide-react";
-import { createBrowserClient } from '@supabase/ssr';
+import { addFavoriteAction, removeFavoriteAction } from "@/app/actions/favorites";
 
 interface SymbolRowProps {
     symbol: string;
@@ -24,31 +24,29 @@ const SymbolRow = memo(({ symbol, price, changePercent, isActive, isFavorite }: 
     const isUp = changePercent >= 0;
     const isLowValue = displayPrice < 1 || cleanSymbol === 'SHIB' || cleanSymbol === 'PEPE';
 
-    const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-
     const toggleFavorite = async (e: React.MouseEvent) => {
         e.stopPropagation();
 
+        // Optimistic update
         if (isFavorite) {
             removeFavorite(symbol);
         } else {
             addFavorite(symbol);
         }
 
+        // Server action (authenticated, with proper user lookup)
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+            const result = isFavorite
+                ? await removeFavoriteAction(symbol)
+                : await addFavoriteAction(symbol);
 
-            if (isFavorite) {
-                await supabase.from('favorites').delete().eq('user_id', user.id).eq('symbol', symbol);
-            } else {
-                await supabase.from('favorites').insert({ user_id: user.id, symbol: symbol });
+            // Rollback on failure
+            if (!result.success) {
+                if (isFavorite) addFavorite(symbol);
+                else removeFavorite(symbol);
             }
-        } catch (err) {
-            console.error("Error updating favorite:", err);
+        } catch {
+            // Rollback on error
             if (isFavorite) addFavorite(symbol);
             else removeFavorite(symbol);
         }
@@ -57,22 +55,10 @@ const SymbolRow = memo(({ symbol, price, changePercent, isActive, isFavorite }: 
     return (
         <div onClick={() => setActiveSymbol(symbol)} className={`flex items-center justify-between p-3 border-b border-border/30 cursor-pointer transition-colors duration-200 group ${isActive ? 'bg-primary/10 border-l-2 border-l-primary' : 'hover:bg-muted/5 border-l-2 border-l-transparent'}`}>
             <div className="flex items-center space-x-3 w-[26%] overflow-hidden">
-                <div className="relative w-6 h-6 rounded-full bg-slate-900 border border-border overflow-hidden flex-shrink-0">
-                    <Image
-                        src={`https://bin.bnbstatic.com/static/assets/logos/${cleanSymbol}.png`}
-                        alt={cleanSymbol}
-                        fill
-                        sizes="24px"
-                        className="object-cover p-0.5"
-                        onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.src = 'https://bin.bnbstatic.com/static/assets/logos/BTC.png';
-                        }}
-                    />
-                </div>
+                <CryptoIcon symbol={symbol} size={24} />
                 <div className="flex flex-col min-w-0">
                     <span className="font-bold text-xs text-foreground tracking-tight truncate">{cleanSymbol}</span>
-                    <span className="text-[9px] text-slate-500 font-medium">USDT</span>
+                    <span className="text-[9px] text-muted font-medium">USDT</span>
                 </div>
             </div>
             <div className="w-[40%] text-right overflow-hidden">
@@ -86,7 +72,7 @@ const SymbolRow = memo(({ symbol, price, changePercent, isActive, isFavorite }: 
                 </div>
             </div>
             <div className="w-[24%] text-right overflow-hidden">
-                <div className={`text-[10px] font-bold ${isUp ? 'text-green-500' : 'text-red-500'} truncate`}>
+                <div className={`text-[10px] font-bold ${isUp ? 'text-up' : 'text-down'} truncate`}>
                     {isUp ? '▲' : '▼'} {Math.abs(changePercent).toFixed(2)}%
                 </div>
             </div>
@@ -95,7 +81,7 @@ const SymbolRow = memo(({ symbol, price, changePercent, isActive, isFavorite }: 
                     onClick={toggleFavorite}
                     className="p-1.5 hover:bg-muted/20 rounded-full transition-colors active:scale-90"
                 >
-                    <Star className={`transition-colors duration-200 cursor-pointer ${isFavorite ? "fill-yellow-400 text-yellow-400" : "text-slate-600 hover:text-slate-400"}`}
+                    <Star className={`transition-colors duration-200 cursor-pointer ${isFavorite ? "fill-yellow-400 text-yellow-400" : "text-muted hover:text-muted-foreground"}`}
                         size={14}
                     />
                 </button>
@@ -103,7 +89,8 @@ const SymbolRow = memo(({ symbol, price, changePercent, isActive, isFavorite }: 
         </div>
     );
 }, (prev, next) => {
-    return prev.price === next.price &&
+    return prev.symbol === next.symbol &&
+        prev.price === next.price &&
         prev.isActive === next.isActive &&
         prev.changePercent === next.changePercent &&
         prev.isFavorite === next.isFavorite;

@@ -1,20 +1,31 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import { BinanceTicker } from './binance';
+import { calculatePositionPnL, calculatePositionMargin } from './trading-math';
+import { LEVERAGE, type TradeSide } from './config';
 
-const LEVERAGE = 50;
+/** Safe parseFloat that returns fallback instead of NaN */
+function safeParseFloat(value: string, fallback: number = 0): number {
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? fallback : parsed;
+}
+
+export interface TradeNotification {
+    id: string;
+    message: string;
+    timestamp: number;
+    read: boolean;
+}
 
 export interface Position {
     id: string;
     symbol: string;
-    side: 'BUY' | 'SELL';
+    side: TradeSide;
     amount: number;
-    open_price: number;
-    liquidation_price:number;
-}
-
-export interface Favorite {
-    id: string;
-    symbol: string;
+    entry_price: number;
+    liquidation_price: number;
+    stop_loss?: number;
+    take_profit?: number;
 }
 
 interface MarketState {
@@ -25,22 +36,31 @@ interface MarketState {
     priceChangePercent: number;
     balance: number;
     equity: number;
-    freeMargin: number;
-    openPositions: Position[]
+    usedMargin: number;
+    available: number;
+    openPositions: Position[];
     favorites: Set<string>;
+    positionsVersion: number;
+    notifications: TradeNotification[];
+    wsConnected: boolean;
+    setWsConnected: (connected: boolean) => void;
+    bumpPositionsVersion: () => void;
+    addNotification: (message: string) => void;
+    markAllAsRead: () => void;
+    clearNotifications: () => void;
     setInitialMarketData: (data: BinanceTicker[]) => void;
-    updateTickersBatch: (tickers: any[]) => void;
+    updateTickersBatch: (tickers: Array<{ s: string; c: string; P: string }>) => void;
     setActiveSymbol: (symbol: string) => void;
     updateActiveSymbolData: (price: number, change?: number) => void;
     setAccountData: (balance: number, positions: Position[]) => void;
     updateBalance: (balance: number) => void;
     calculateAccountMetrics: () => void;
-    setFavorites: (favorites: Favorite[]) => void;
+    setFavorites: (favorites: Array<{ symbol: string }>) => void;
     addFavorite: (symbol: string) => void;
     removeFavorite: (symbol: string) => void;
 }
 
-export const useMarketStore = create<MarketState>((set) => ({
+export const useMarketStore = create<MarketState>()(persist((set) => ({
     tickersMap: new Map(),
     isMarketLoading: true,
     activeSymbol: 'BTCUSDT',
@@ -49,27 +69,50 @@ export const useMarketStore = create<MarketState>((set) => ({
 
     balance: 0,
     equity: 0,
-    freeMargin: 0,
+    usedMargin: 0,
+    available: 0,
     openPositions: [],
     favorites: new Set(),
+    positionsVersion: 0,
+    notifications: [],
+    wsConnected: false,
 
+    setWsConnected: (connected) => set({ wsConnected: connected }),
+
+    bumpPositionsVersion: () => set((state) => ({ positionsVersion: state.positionsVersion + 1 })),
+
+    addNotification: (message) => set((state) => ({
+        notifications: [
+            { id: crypto.randomUUID(), message, timestamp: Date.now(), read: false },
+            ...state.notifications
+        ].slice(0, 50)
+    })),
+
+    markAllAsRead: () => set((state) => ({
+        notifications: state.notifications.map(n => ({ ...n, read: true }))
+    })),
+
+    clearNotifications: () => set({ notifications: [] }),
+
+    /** Populates tickersMap from initial API fetch and sets active symbol price */
     setInitialMarketData: (data) => {
-        const map = new Map();
+        const map = new Map<string, BinanceTicker>();
         data.forEach(t => map.set(t.symbol, t));
         set((state) => {
             const activeTicker = map.get(state.activeSymbol);
             return {
                 tickersMap: map,
                 isMarketLoading: false,
-                currentPrice: activeTicker ? parseFloat(activeTicker.lastPrice) : state.currentPrice,
-                priceChangePercent: activeTicker ? parseFloat(activeTicker.priceChangePercent) : state.priceChangePercent
+                currentPrice: activeTicker ? safeParseFloat(activeTicker.lastPrice, state.currentPrice) : state.currentPrice,
+                priceChangePercent: activeTicker ? safeParseFloat(activeTicker.priceChangePercent, state.priceChangePercent) : state.priceChangePercent
             };
         });
     },
 
+    /** Applies batch WebSocket ticker updates to the map and refreshes active symbol price */
     updateTickersBatch: (tickerUpdates) => set((state) => {
         const newMap = new Map(state.tickersMap);
-        let activeSymbolUpdate = null;
+        let activeSymbolUpdate: { price: number; change: number } | null = null;
 
         for (const t of tickerUpdates) {
             const symbol = t.s;
@@ -78,7 +121,11 @@ export const useMarketStore = create<MarketState>((set) => ({
                 newMap.set(symbol, { ...prev, lastPrice: t.c, priceChangePercent: t.P || prev.priceChangePercent });
             }
             if (symbol === state.activeSymbol) {
-                activeSymbolUpdate = { price: parseFloat(t.c), change: parseFloat(t.P) };
+                const price = safeParseFloat(t.c);
+                const change = safeParseFloat(t.P);
+                if (price > 0) {
+                    activeSymbolUpdate = { price, change };
+                }
             }
         }
 
@@ -92,8 +139,8 @@ export const useMarketStore = create<MarketState>((set) => ({
         const ticker = state.tickersMap.get(symbol);
         return {
             activeSymbol: symbol,
-            currentPrice: ticker ? parseFloat(ticker.lastPrice) : 0,
-            priceChangePercent: ticker ? parseFloat(ticker.priceChangePercent) : 0
+            currentPrice: ticker ? safeParseFloat(ticker.lastPrice) : 0,
+            priceChangePercent: ticker ? safeParseFloat(ticker.priceChangePercent) : 0
         };
     }),
 
@@ -106,37 +153,34 @@ export const useMarketStore = create<MarketState>((set) => ({
         balance,
         openPositions: positions,
         equity: balance,
-        freeMargin: balance
+        usedMargin: 0,
+        available: balance
     }),
 
     updateBalance: (balance) => set({ balance }),
 
+    /** Recalculates equity, used margin, and available capital from live prices across all open positions */
     calculateAccountMetrics: () => set((state) => {
         let totalUnrealizedPnL = 0;
-        let usedMargin = 0;
+        let totalUsedMargin = 0;
 
-        state.openPositions.forEach(pos => {
+        for (const pos of state.openPositions) {
             const ticker = state.tickersMap.get(pos.symbol);
             if (ticker) {
-                const currentPrice = parseFloat(ticker.lastPrice);
-
-                let pnl = 0;
-                if (pos.side === 'BUY') {
-                    pnl = (currentPrice - pos.open_price) * pos.amount;
-                } else {
-                    pnl = (pos.open_price - currentPrice) * pos.amount;
+                const currentPrice = safeParseFloat(ticker.lastPrice);
+                if (currentPrice > 0) {
+                    totalUnrealizedPnL += calculatePositionPnL(pos.side, pos.entry_price, currentPrice, pos.amount);
+                    // Used = half of required margin per position
+                    totalUsedMargin += calculatePositionMargin(pos.entry_price, pos.amount, LEVERAGE) / 2;
                 }
-                totalUnrealizedPnL += pnl;
-
-                usedMargin += (pos.open_price * pos.amount) / LEVERAGE;
             }
-        });
+        }
 
         const equity = state.balance + totalUnrealizedPnL;
+        // Available = Balance - Used + Unrealized P/L = Equity - Used
+        const available = equity - totalUsedMargin;
 
-        const freeMargin = Math.max(0, equity - usedMargin);
-
-        return { equity, freeMargin };
+        return { equity, usedMargin: totalUsedMargin, available };
     }),
 
     setFavorites: (favs) => set({
@@ -154,4 +198,7 @@ export const useMarketStore = create<MarketState>((set) => ({
         newSet.delete(symbol);
         return { favorites: newSet };
     })
+}), {
+    name: 'cfd-notifications',
+    partialize: (state) => ({ notifications: state.notifications }),
 }))

@@ -1,51 +1,57 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { createBrowserClient } from '@supabase/ssr'
-import { useQueryClient } from "@tanstack/react-query";
-import { BinanceTicker } from "@/lib/binance";
-import { closePosition, updateOrder } from "@/app/actions/trade/trade";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { useMarketStore } from "@/lib/store";
+import { closePosition, updateOrder } from "@/app/actions/trade";
 import { toast } from "sonner";
 import { Order } from "@/app/market/_components/_primaryContent/_positionsPanel/types";
+import { BinanceTicker } from "@/lib/binance";
 
 export const usePositions = () => {
     const [activeTab, setActiveTab] = useState<'OPEN' | 'HISTORY'>('OPEN');
-    const [orders, setOrders] = useState<Order[]>([]);
-
+    const [positions, setPositions] = useState<Order[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingOrder, setEditingOrder] = useState<Order | null>(null);
 
-    const supabase = useMemo(() => createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    ), []);
+    const supabase = createClient();
 
-    const queryClient = useQueryClient();
-    const tickersData = queryClient.getQueryData<BinanceTicker[]>(['binance-tickers']);
+    const tickersMap = useMarketStore((state) => state.tickersMap);
+    const addNotification = useMarketStore((state) => state.addNotification);
+    const bumpPositionsVersion = useMarketStore((state) => state.bumpPositionsVersion);
+
+    const positionsVersion = useMarketStore((state) => state.positionsVersion);
+
+    const fetchPositions = useCallback(async () => {
+        const { data } = await supabase
+            .from('positions')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (data) setPositions(data as Order[]);
+        setIsLoading(false);
+    }, [supabase]);
 
     useEffect(() => {
-        const fetchOrders = async () => {
-            const { data } = await supabase
-                .from('positions')
-                .select('*')
-                .order('created_at', { ascending: false });
+        fetchPositions();
 
-            if (data) setOrders(data as Order[]);
-        };
-
-        fetchOrders();
-
-        const channel = supabase.channel('realtime positions')
+        const channel = supabase.channel('realtime-positions')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'positions' }, () => {
-                fetchOrders();
+                fetchPositions();
             })
             .subscribe();
 
-        return () => { supabase.removeChannel(channel) }
-    }, [supabase]);
+        return () => { supabase.removeChannel(channel); };
+    }, [supabase, fetchPositions]);
+
+    useEffect(() => {
+        if (positionsVersion === 0) return;
+        fetchPositions();
+    }, [positionsVersion, fetchPositions]);
 
     const visibleOrders = useMemo(() => {
-        return orders
+        return positions
             .filter(o => activeTab === 'OPEN' ? o.status === 'OPEN' : o.status !== 'OPEN')
             .sort((a, b) => {
                 if (activeTab === 'HISTORY') {
@@ -58,28 +64,29 @@ export const usePositions = () => {
                     return dateB - dateA;
                 }
             });
-    }, [orders, activeTab]);
+    }, [positions, activeTab]);
 
     const handleClose = async (id: string, symbol: string) => {
-        const ticker = tickersData?.find(t => t.symbol === symbol);
+        const ticker = tickersMap.get(symbol);
         const estimatedPrice = ticker ? parseFloat(ticker.lastPrice) : 0;
 
         if (estimatedPrice === 0) {
-            toast.error("Waiting for market data...");
+            toast.error("Market data not available yet, please try again.");
             return;
         }
 
-        const previousOrders = [...orders];
+        const previousPositions = [...positions];
 
-        setOrders(prev => prev.map(o => {
+        setPositions(prev => prev.map(o => {
             if (o.id === id) {
                 const pnl = o.side === 'BUY'
-                    ? (estimatedPrice - o.open_price) * o.amount
-                    : (o.open_price - estimatedPrice) * o.amount;
+                    ? (estimatedPrice - o.entry_price) * o.amount
+                    : (o.entry_price - estimatedPrice) * o.amount;
+
                 return {
                     ...o,
                     status: 'CLOSED',
-                    close_price: estimatedPrice,
+                    exit_price: estimatedPrice,
                     closed_at: new Date().toISOString(),
                     pnl
                 };
@@ -92,21 +99,24 @@ export const usePositions = () => {
         toast.promise(promise, {
             loading: 'Closing position...',
             success: (res) => {
-                if(!res.success) {
-                    setOrders(previousOrders);
+                if (!res.success) {
+                    setPositions(previousPositions);
                     throw new Error(res.message);
                 }
+                bumpPositionsVersion();
+                const cleanSymbol = symbol.replace('USDT', '');
+                addNotification(`${cleanSymbol} position closed. ${res.message}`);
                 return res.message;
             },
             error: (err) => {
-                setOrders(previousOrders);
+                setPositions(previousPositions);
                 return `Error: ${err.message}`;
             }
         });
     };
 
     const openEditModal = (id: string) => {
-        const order = orders.find(o => o.id === id);
+        const order = positions.find(o => o.id === id);
         if (order) {
             setEditingOrder(order);
             setIsEditModalOpen(true);
@@ -114,7 +124,7 @@ export const usePositions = () => {
     };
 
     const handleSaveEdit = async (id: string, sl: number, tp: number) => {
-        setOrders(prev => prev.map(o => o.id === id ? { ...o, stop_loss: sl || undefined, take_profit: tp || undefined } : o));
+        setPositions(prev => prev.map(o => o.id === id ? { ...o, stop_loss: sl || undefined, take_profit: tp || undefined } : o));
         setIsEditModalOpen(false);
 
         const promise = updateOrder(id, { stopLoss: sl, takeProfit: tp });
@@ -122,18 +132,21 @@ export const usePositions = () => {
         toast.promise(promise, {
             loading: 'Updating risk settings...',
             success: (res) => {
-                if(!res.success) throw new Error(res.message);
+                if (!res.success) throw new Error(res.message);
                 return "Order updated";
             },
             error: "Update failed"
         });
     };
 
+    const tickersData: BinanceTicker[] = useMemo(() => Array.from(tickersMap.values()), [tickersMap]);
+
     return {
         activeTab,
-        orders,
+        orders: positions,
         visibleOrders,
         tickersData,
+        isLoading,
         isEditModalOpen,
         editingOrder,
         setActiveTab,

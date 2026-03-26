@@ -1,18 +1,23 @@
 import {BinanceTicker} from "@/lib/binance";
 
+// Represents a single trading position as stored in the database.
 export interface Order {
     id: string;
+    user_id: string;
     symbol: string;
     side: 'BUY' | 'SELL';
     amount: number;
-    open_price: number;
-    close_price?: number;
+    status: 'OPEN' | 'CLOSED' | 'LIQUIDATED';
+    entry_price: number;
+    exit_price?: number;
+    leverage: number;
+    margin: number;
+    liquidation_price?: number;
     pnl?: number;
-    status: 'OPEN' | 'CLOSED';
-    created_at: string;
-    closed_at?: string;
     stop_loss?: number;
     take_profit?: number;
+    created_at: string;
+    closed_at?: string;
 }
 
 export interface PositionsTabsProps {
@@ -32,7 +37,7 @@ export interface PositionsTableProps {
 export interface PositionRowProps {
     order: Order;
     activeTab: 'OPEN' | 'HISTORY';
-    tickersData: BinanceTicker[] | undefined;
+    tickersData?: BinanceTicker[];
     onClose: (id: string, symbol: string) => void;
     onEdit: (id: string) => void;
 }

@@ -16,8 +16,18 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-    title: "Crypto Broker",
-    description: "Crypto Broker by Oskar",
+    title: {
+        default: "CryptoBroker — Trade Crypto with Up to 50x Leverage",
+        template: "%s | CryptoBroker",
+    },
+    description:
+        "Trade 100+ cryptocurrency CFDs with up to 50x leverage. Real-time Binance prices, professional charts, and built-in risk management. Start free with a $10,000 demo account.",
+    metadataBase: new URL("https://crypto-broker.app"),
+    openGraph: {
+        type: "website",
+        siteName: "CryptoBroker",
+        locale: "en_US",
+    },
 };
 
 export default function RootLayout({children,}: Readonly<{
@@ -25,7 +35,7 @@ export default function RootLayout({children,}: Readonly<{
 }>) {
     return (
         <html lang="en" suppressHydrationWarning>
-        <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <body className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-x-hidden`}>
         <ThemeProvider
             attribute="class"
             defaultTheme="dark"

@@ -26,23 +26,38 @@ export async function updateSession(request: NextRequest) {
                         request,
                     })
                     cookiesToSet.forEach(({ name, value, options }) => {
-                        const myOptions ={
+                        supabaseResponse.cookies.set(name, value, {
                             ...options,
-                            maxAge: 12*60*60,
-                        }
-                        supabaseResponse.cookies.set(name, value, myOptions)
+                            maxAge: options?.maxAge ?? 12 * 60 * 60,
+                        })
                     })
                 },
             },
         }
     )
 
+    const getUserWithTimeout = async () => {
+        try {
+            const result = await Promise.race([
+                supabase.auth.getUser(),
+                new Promise<{ data: { user: null }; error: null }>((resolve) =>
+                    setTimeout(() => resolve({ data: { user: null }, error: null }), 5000)
+                ),
+            ]);
+            return result;
+        } catch {
+            return { data: { user: null }, error: null };
+        }
+    };
+
     const {
         data: { user },
-    } = await supabase.auth.getUser()
+    } = await getUserWithTimeout()
 
     const isAuthPage = request.nextUrl.pathname.startsWith('/login') ||
-        request.nextUrl.pathname.startsWith('/register')
+        request.nextUrl.pathname.startsWith('/register') ||
+        request.nextUrl.pathname.startsWith('/forgot-password')
+    const isResetPassword = request.nextUrl.pathname.startsWith('/reset-password')
     const isDashboardPage = request.nextUrl.pathname.startsWith('/market')
 
     if (!user && isDashboardPage) {
@@ -51,7 +66,7 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url)
     }
 
-    if (user && isAuthPage) {
+    if (user && isAuthPage && !isResetPassword) {
         const url = request.nextUrl.clone()
         url.pathname = '/market'
         return NextResponse.redirect(url)

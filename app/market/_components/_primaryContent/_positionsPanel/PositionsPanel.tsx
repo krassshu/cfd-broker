@@ -12,6 +12,7 @@ export default function PositionsPanel() {
         orders,
         visibleOrders,
         tickersData,
+        isLoading,
         isEditModalOpen,
         editingOrder,
         setActiveTab,
@@ -32,6 +33,7 @@ export default function PositionsPanel() {
                 orders={visibleOrders}
                 activeTab={activeTab}
                 tickersData={tickersData}
+                isLoading={isLoading}
                 onClose={handleClose}
                 onEdit={openEditModal}
             />

@@ -1,64 +1,79 @@
 'use server'
 
-import { createClient } from "./utils";
+import { createClient } from "@/lib/supabase/server";
 import { getTicker } from "@/lib/binance";
+import { calculatePositionPnL } from "@/lib/trading-math";
 import { revalidatePath } from "next/cache";
+import { ClosePositionSchema, parseSchema } from "@/lib/schemas";
+import { RATE_LIMIT_CLOSE, type TradeSide } from "@/lib/config";
+import { rateLimit } from "@/lib/rate-limit";
 
+/** Closes a position at current market price via atomic RPC (validates, calculates P&L, settles) */
 export async function closePosition(positionId: string) {
+    const validation = parseSchema(ClosePositionSchema, { positionId });
+    if (!validation.success) return { success: false, message: validation.message };
+
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, message: "Unauthorized" };
+
+    if (!rateLimit(`close:${user.id}`, RATE_LIMIT_CLOSE.max, RATE_LIMIT_CLOSE.windowMs)) {
+        return { success: false, message: "Too many requests. Please wait." };
+    }
 
     try {
         const { data: position } = await supabase
             .from('positions')
-            .select('*')
+            .select('id, symbol, side, entry_price, amount')
             .eq('id', positionId)
-            .eq('user_id', user?.id) // Security check
+            .eq('user_id', user.id)
             .single();
 
         if (!position) return { success: false, message: "Position not found" };
-        if (position.status !== 'OPEN') return { success: false, message: "Position already closed" };
 
         const tickers = await getTicker();
-        const ticker = tickers.find((t: any) => t.symbol === position.symbol);
-
+        const ticker = tickers.find(t => t.symbol === position.symbol);
         if (!ticker) return { success: false, message: "Market unavailable" };
 
         const currentPrice = parseFloat(ticker.lastPrice);
-
-        let pnl = 0;
-        if (position.side === 'BUY') {
-            pnl = (currentPrice - position.entry_price) * position.amount;
-        } else {
-            pnl = (position.entry_price - currentPrice) * position.amount;
+        if (isNaN(currentPrice) || currentPrice <= 0) {
+            return { success: false, message: "Invalid market price. Please try again." };
         }
 
-        const { error: updateError } = await supabase.from('positions').update({
-            status: 'CLOSED',
-            exit_price: currentPrice,
-            closed_at: new Date().toISOString(),
-            pnl: pnl
-        }).eq('id', positionId);
+        const pnl = calculatePositionPnL(
+            position.side as TradeSide,
+            position.entry_price,
+            currentPrice,
+            position.amount
+        );
 
-        if (updateError) throw updateError;
-
-        const returnAmount = position.margin + pnl;
-
-        await supabase.from('transactions').insert({
-            user_id: position.user_id,
-            amount: returnAmount,
-            type: 'REALIZED_PNL',
-            reference_id: positionId
+        const { data, error } = await supabase.rpc('close_position_atomic', {
+            p_user_id: user.id,
+            p_position_id: positionId,
+            p_exit_price: currentPrice,
+            p_pnl: pnl,
         });
+
+        if (error) {
+            console.error('close_position_atomic RPC error:', error.message);
+            return { success: false, message: "Failed to close position. Please try again." };
+        }
+
+        const result = data as { success: boolean; message: string; close_price?: number; pnl?: number };
+
+        if (!result.success) {
+            return { success: false, message: result.message };
+        }
 
         revalidatePath('/market');
         return {
             success: true,
-            message: `Closed at $${currentPrice.toFixed(2)}. P/L: $${pnl.toFixed(2)}`,
+            message: result.message,
             data: { closePrice: currentPrice, pnl }
         };
 
-    } catch (e: any) {
-        return { success: false, message: "Close failed: " + e.message };
+    } catch (e: unknown) {
+        console.error('closePosition error:', e);
+        return { success: false, message: "Failed to close position. Please try again." };
     }
 }

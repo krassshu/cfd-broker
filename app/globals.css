@@ -2,6 +2,10 @@
 
 @source "../app/**/*.{js,ts,jsx,tsx,mdx}";
 
+html {
+  scroll-behavior: smooth;
+}
+
 @layer base {
   :root {
     --background: #f8fafc;
@@ -12,8 +16,19 @@
     --primary-foreground: #ffffff;
     --border: #e2e8f0;
     --muted: #64748b;
+    --muted-foreground: #475569;
     --accent-up: #22c55e;
     --accent-down: #ef4444;
+    --section-alt: #eff4ff;
+    --card-surface: rgba(255, 255, 255, 0.8);
+    --card-surface-hover: rgba(255, 255, 255, 0.95);
+    --blob-primary: rgba(37, 99, 235, 0.15);
+    --blob-accent: rgba(168, 85, 247, 0.10);
+    --section-border: rgba(37, 99, 235, 0.10);
+    --landing-card-border: rgba(37, 99, 235, 0.10);
+    --landing-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    --cta-from: rgba(37, 99, 235, 0.05);
+    --cta-via: rgba(37, 99, 235, 0.10);
 
     --font-geist-sans: "Geist Sans", sans-serif;
     --font-geist-mono: "Geist Mono", monospace;
@@ -28,6 +43,17 @@
     --primary-foreground: #ffffff;
     --border: #1e293b;
     --muted: #94a3b8;
+    --muted-foreground: #cbd5e1;
+    --section-alt: transparent;
+    --card-surface: rgba(15, 23, 42, 0.2);
+    --card-surface-hover: rgba(15, 23, 42, 0.5);
+    --blob-primary: rgba(59, 130, 246, 0.05);
+    --blob-accent: rgba(168, 85, 247, 0.05);
+    --section-border: rgba(30, 41, 59, 0.3);
+    --landing-card-border: rgba(30, 41, 59, 0.3);
+    --landing-card-shadow: none;
+    --cta-from: rgba(15, 23, 42, 0.8);
+    --cta-via: rgba(59, 130, 246, 0.05);
   }
 }
 
@@ -40,8 +66,16 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-border: var(--border);
   --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
   --color-up: var(--accent-up);
   --color-down: var(--accent-down);
+  --color-section-alt: var(--section-alt);
+  --color-card-surface: var(--card-surface);
+  --color-card-surface-hover: var(--card-surface-hover);
+  --color-blob-primary: var(--blob-primary);
+  --color-blob-accent: var(--blob-accent);
+  --color-section-border: var(--section-border);
+  --color-landing-card-border: var(--landing-card-border);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -69,4 +103,76 @@
 
 .animate-pan {
   animation: panBackground 18s ease-in-out infinite alternate;
+}
+
+@keyframes ticker {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-ticker {
+  animation: ticker 80s linear infinite;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.7s ease-out both;
+}
+
+.animate-delay-100 { animation-delay: 100ms; }
+.animate-delay-200 { animation-delay: 200ms; }
+.animate-delay-300 { animation-delay: 300ms; }
+.animate-delay-400 { animation-delay: 400ms; }
+.animate-delay-500 { animation-delay: 500ms; }
+.animate-delay-600 { animation-delay: 600ms; }
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(-12px) scale(1.3);
+    opacity: 0.8;
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Landing page card — auto-adapts to light/dark via CSS variables */
+.landing-card {
+  background: var(--card-surface);
+  border-color: var(--landing-card-border);
+  box-shadow: var(--landing-card-shadow);
+}
+.landing-card:hover {
+  background: var(--card-surface-hover);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+/* Smooth alternating section background — fades in/out to avoid hard edges */
+.section-gradient {
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    var(--section-alt) 12%,
+    var(--section-alt) 88%,
+    transparent 100%
+  );
 }

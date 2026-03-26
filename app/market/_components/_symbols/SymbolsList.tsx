@@ -2,6 +2,7 @@
 import { useState, useMemo } from "react";
 import SymbolRow from "./SymbolRow";
 import SymbolsSearch from "./SymbolsSearch";
+import SymbolsListSkeleton from "./SymbolsListSkeleton";
 import { useMarketStore } from "@/lib/store";
 import Tabs, { TabType } from "@/app/market/_components/_symbols/_tabs/Tabs";
 
@@ -41,33 +42,35 @@ export default function SymbolsList() {
         <div className="h-full flex-shrink-0 flex flex-col font-sans">
             <Tabs activeTab={activeTab} onTabChange={setActiveTab} />
 
-            <div className="w-80 h-[calc(100vh-140px)] bg-card border border-border rounded-sm rounded-tl-none shadow-xl overflow-hidden flex flex-col">
+            <div className="w-80 h-full bg-card border border-border rounded-sm rounded-tl-none shadow-xl overflow-hidden flex flex-col">
                 <SymbolsSearch value={searchQuery} onChange={setSearchQuery} />
                 <div className="p-3 border-b border-border/50 bg-background/50">
                     <div className="flex justify-between items-center text-[10px] text-muted font-bold uppercase tracking-wider">
-                        <span className="w-[26%] text-slate-500 pl-1">Symbol</span>
-                        <span className="w-[40%] text-right text-slate-500">Price</span>
-                        <span className="w-[24%] text-right text-slate-500">24h %</span>
-                        <span className="w-[10%] text-center text-slate-500">Fav</span>
+                        <span className="w-[26%] text-muted pl-1">Symbol</span>
+                        <span className="w-[40%] text-right text-muted">Price</span>
+                        <span className="w-[24%] text-right text-muted">24h %</span>
+                        <span className="w-[10%] text-center text-muted">Fav</span>
                     </div>
                 </div>
                 <div className="overflow-y-auto flex-1 custom-scrollbar">
-                    {isLoading && <div className="p-4 text-muted text-xs animate-pulse font-bold text-center">LOADING MARKETS...</div>}
-                    {!isLoading && filteredData.length === 0 && (
-                        <div className="p-8 text-center text-xs text-slate-500 italic">
+                    {isLoading ? (
+                        <SymbolsListSkeleton />
+                    ) : filteredData.length === 0 ? (
+                        <div className="p-8 text-center text-xs text-muted italic">
                             {activeTab === 'FAV' ? "No favorites yet" : "No assets found"}
                         </div>
+                    ) : (
+                        filteredData.map((ticker) => (
+                            <SymbolRow
+                                key={ticker.symbol}
+                                symbol={ticker.symbol}
+                                price={parseFloat(ticker.lastPrice)}
+                                changePercent={parseFloat(ticker.priceChangePercent)}
+                                isActive={activeSymbol === ticker.symbol}
+                                isFavorite={favorites.has(ticker.symbol)}
+                            />
+                        ))
                     )}
-                    {!isLoading && filteredData.map((ticker) => (
-                        <SymbolRow
-                            key={ticker.symbol}
-                            symbol={ticker.symbol}
-                            price={parseFloat(ticker.lastPrice)}
-                            changePercent={parseFloat(ticker.priceChangePercent)}
-                            isActive={activeSymbol === ticker.symbol}
-                            isFavorite={favorites.has(ticker.symbol)}
-                        />
-                    ))}
                 </div>
             </div>
         </div>

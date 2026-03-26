@@ -3,6 +3,17 @@
 import { useEffect } from "react";
 import { Minus, Plus } from "lucide-react";
 
+/**Returns step size and precision based on current crypto price.*/
+export function getStepForPrice(price: number) {
+    if (price > 10_000) return { step: 0.001, precision: 3 };
+    if (price > 1_000)  return { step: 0.01,  precision: 2 };
+    if (price > 100)    return { step: 0.1,   precision: 1 };
+    if (price > 10)     return { step: 1,     precision: 0 };
+    if (price > 1)      return { step: 10,    precision: 0 };
+    if (price > 0.1)    return { step: 100,   precision: 0 };
+    return { step: 1000, precision: 0 };
+}
+
 interface QuantitySelectorProps {
     currentPrice: number;
     value: string;
@@ -11,18 +22,13 @@ interface QuantitySelectorProps {
 }
 
 export function QuantitySelector({ currentPrice, value, onChange, userBalance }: QuantitySelectorProps) {
-    const getStepAndPrecision = (price: number) => {
-        if (price > 10000) return { step: 0.001, precision: 3 }
-        if (price > 100) return { step: 0.01, precision: 2 }
-        if (price > 1) return { step: 0.1, precision: 1 }
-        return { step: 1, precision: 0 }
-    };
-
-    const { step, precision } = getStepAndPrecision(currentPrice);
+    const { step, precision } = getStepForPrice(currentPrice);
 
     useEffect(() => {
+        if (currentPrice <= 0) return;
+
         const numVal = parseFloat(value);
-        if (!value || numVal === 0 || (value === "1" && step < 1)) {
+        if (numVal === 0 || isNaN(numVal)) {
             onChange(step.toString());
         }
     }, [currentPrice, step]);
@@ -45,13 +51,33 @@ export function QuantitySelector({ currentPrice, value, onChange, userBalance }:
     };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = e.target.value;
-        if (val.includes('-')) return;
-        onChange(val);
+        const raw = e.target.value;
+
+        // Allow empty for typing, but block negative and scientific notation
+        if (raw === '') {
+            onChange('');
+            return;
+        }
+
+        // Block negative signs, 'e' scientific notation, and multiple dots
+        if (/[eE\-+]/.test(raw)) return;
+
+        // Validate it's a proper positive number format
+        if (!/^\d*\.?\d*$/.test(raw)) return;
+
+        onChange(raw);
+    };
+
+    // When input loses focus, clean up the value
+    const handleBlur = () => {
+        const num = parseFloat(value);
+        if (isNaN(num) || num <= 0) {
+            onChange(step.toString());
+        }
     };
 
     return (
-        <div className="flex flex-col justify-center h-full">
+        <div className="relative flex flex-col justify-center h-full">
             <div className={`flex items-center justify-between h-8 w-[120px] bg-background/50 border rounded transition-colors ${hasInsufficientFunds ? 'border-red-500/50' : 'border-border hover:border-primary/30 focus-within:border-primary/50'}`}>
                 <button
                     onClick={handleDecrement}
@@ -61,14 +87,14 @@ export function QuantitySelector({ currentPrice, value, onChange, userBalance }:
                 </button>
                 <div className="flex-1 relative h-full">
                     <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         id="amount"
                         value={value}
                         onChange={handleInputChange}
-                        step={step}
-                        min={step}
+                        onBlur={handleBlur}
                         placeholder={step.toString()}
-                        className="w-full h-full bg-transparent text-center text-xs font-mono font-bold focus:outline-none placeholder:text-muted/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"/>
+                        className="w-full h-full bg-transparent text-center text-xs font-mono font-bold focus:outline-none placeholder:text-muted/30"/>
                 </div>
                 <button
                     onClick={handleIncrement}

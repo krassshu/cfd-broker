@@ -17,8 +17,12 @@ export async function createClient() {
                         cookiesToSet.forEach(({ name, value, options }) =>
                             cookieStore.set(name, value, options)
                         )
-                    } catch {
-
+                    } catch (error) {
+                        // Cookie setting can fail in Server Components (read-only context)
+                        // This is expected behavior - only log in development
+                        if (process.env.NODE_ENV === 'development') {
+                            console.warn('Supabase cookie set failed (expected in Server Components):', error);
+                        }
                     }
                 },
             },

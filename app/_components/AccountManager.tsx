@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useMarketStore, Position } from "@/lib/store";
 import { closePosition } from "@/app/actions/trade";
 import { toast } from "sonner";
-import { METRICS_DEBOUNCE_MS } from "@/lib/config";
 
 /** Headless component: syncs account data from Supabase, recalculates metrics on tick, auto-closes positions on SL/TP or when available capital <= 0 */
 export default function AccountManager() {
@@ -21,7 +20,6 @@ export default function AccountManager() {
     const positionsVersion = useMarketStore((state) => state.positionsVersion);
 
     const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
-    const metricsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const supabase = createClient();
 
@@ -89,18 +87,11 @@ export default function AccountManager() {
         fetchAccountData();
     }, [positionsVersion, fetchAccountData]);
 
+    /** Recalculate account metrics synchronously on every tick/position/balance change.
+     *  The calculation is O(openPositions.length) which is tiny — no debounce needed. */
     useEffect(() => {
         if (tickersMap.size === 0) return;
-
-        if (metricsTimerRef.current) clearTimeout(metricsTimerRef.current);
-
-        metricsTimerRef.current = setTimeout(() => {
-            calculateAccountMetrics();
-        }, METRICS_DEBOUNCE_MS);
-
-        return () => {
-            if (metricsTimerRef.current) clearTimeout(metricsTimerRef.current);
-        };
+        calculateAccountMetrics();
     }, [tickersMap, openPositions, balance, calculateAccountMetrics]);
 
     /** Auto-close logic: SL/TP per position + margin call when available <= 0 */

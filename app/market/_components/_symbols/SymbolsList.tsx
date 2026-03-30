@@ -11,6 +11,7 @@ export default function SymbolsList() {
     const [activeTab, setActiveTab] = useState<TabType>('FAV');
 
     const tickersMap = useMarketStore((state) => state.tickersMap);
+    const tickersVersion = useMarketStore((state) => state.tickersVersion);
     const favorites = useMarketStore((state) => state.favorites);
     const isLoading = useMarketStore((state) => state.isMarketLoading);
     const activeSymbol = useMarketStore((state) => state.activeSymbol);
@@ -36,7 +37,8 @@ export default function SymbolsList() {
         }
 
         return data;
-    }, [tickersMap, searchQuery, activeTab, favorites]);
+        // tickersVersion guarantees memo invalidation on every WebSocket batch update
+    }, [tickersMap, tickersVersion, searchQuery, activeTab, favorites]);
 
     return (
         <div className="h-full flex-shrink-0 flex flex-col font-sans">

@@ -98,7 +98,9 @@ export default function MarketManager() {
         const init = async () => {
             try {
                 const data = await getTicker();
-                if (isMounted) setInitialMarketData(data);
+                if (!isMounted) return; // Strict Mode guard: don't proceed if already unmounted
+
+                setInitialMarketData(data);
 
                 cleanupWs = createReconnectingWs(
                     `${BINANCE_WS_BASE}/ws/!ticker@arr`,

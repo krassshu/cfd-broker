@@ -47,7 +47,7 @@ export default function UserDropDown() {
                 className="absolute right-0 z-50 mt-2 w-48 origin-top-right transition data-closed:scale-95 data-closed:opacity-0 data-enter:duration-200 data-enter:ease-out data-leave:duration-150 data-leave:ease-in"
             >
                 <div className="bg-card border border-border rounded-lg shadow-xl overflow-hidden p-1">
-                    <CloseButton as={Link} href="/market/settings"
+                    <CloseButton as={Link} href="/market/account"
                         className="flex items-center w-full px-3 py-2 space-x-3 rounded-md cursor-pointer transition-colors hover:bg-muted/10 text-foreground outline-none"
                     >
                         <UserCircle className="size-4"/>

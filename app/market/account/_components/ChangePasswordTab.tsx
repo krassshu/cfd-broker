@@ -48,7 +48,7 @@ export default function ChangePasswordTab() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex items-center justify-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
                     <Lock className="w-5 h-5 text-primary" />
                 </div>
@@ -139,7 +139,7 @@ export default function ChangePasswordTab() {
     );
 }
 
-/* ─── Reusable password field ─────────────────────────── */
+// Reusable password field
 
 function PasswordField({
     label,

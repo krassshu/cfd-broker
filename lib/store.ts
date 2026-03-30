@@ -30,6 +30,10 @@ export interface Position {
 
 interface MarketState {
     tickersMap: Map<string, BinanceTicker>;
+    /** Monotonically increasing counter — bumped on every ticker batch update to guarantee
+     *  downstream selectors (SymbolsList, PositionRow, etc.) always detect the change,
+     *  even when Map reference equality is unreliable across frameworks/middlewares. */
+    tickersVersion: number;
     isMarketLoading: boolean;
     activeSymbol: string;
     currentPrice: number;
@@ -62,6 +66,7 @@ interface MarketState {
 
 export const useMarketStore = create<MarketState>()(persist((set) => ({
     tickersMap: new Map(),
+    tickersVersion: 0,
     isMarketLoading: true,
     activeSymbol: 'BTCUSDT',
     currentPrice: 0,
@@ -102,6 +107,7 @@ export const useMarketStore = create<MarketState>()(persist((set) => ({
             const activeTicker = map.get(state.activeSymbol);
             return {
                 tickersMap: map,
+                tickersVersion: state.tickersVersion + 1,
                 isMarketLoading: false,
                 currentPrice: activeTicker ? safeParseFloat(activeTicker.lastPrice, state.currentPrice) : state.currentPrice,
                 priceChangePercent: activeTicker ? safeParseFloat(activeTicker.priceChangePercent, state.priceChangePercent) : state.priceChangePercent
@@ -131,6 +137,7 @@ export const useMarketStore = create<MarketState>()(persist((set) => ({
 
         return {
             tickersMap: newMap,
+            tickersVersion: state.tickersVersion + 1,
             ...(activeSymbolUpdate ? { currentPrice: activeSymbolUpdate.price, priceChangePercent: activeSymbolUpdate.change } : {})
         };
     }),
@@ -144,10 +151,32 @@ export const useMarketStore = create<MarketState>()(persist((set) => ({
         };
     }),
 
-    updateActiveSymbolData: (price, change) => set((state) => ({
-        currentPrice: price,
-        priceChangePercent: change !== undefined ? change : state.priceChangePercent
-    })),
+    /** Updates active symbol price AND its tickersMap entry so all consumers
+     *  (SymbolsList, PositionRow, calculateAccountMetrics) see live data. */
+    updateActiveSymbolData: (price, change) => set((state) => {
+        const priceStr = price.toString();
+        const changeStr = change !== undefined ? change.toString() : undefined;
+        const priceChangePercent = change !== undefined ? change : state.priceChangePercent;
+
+        // Also update the active symbol inside tickersMap so derived data stays fresh
+        const existingTicker = state.tickersMap.get(state.activeSymbol);
+        let tickersMap = state.tickersMap;
+        let tickersVersion = state.tickersVersion;
+
+        if (existingTicker) {
+            const updatedTicker = {
+                ...existingTicker,
+                lastPrice: priceStr,
+                ...(changeStr !== undefined ? { priceChangePercent: changeStr } : {}),
+            };
+            const newMap = new Map(state.tickersMap);
+            newMap.set(state.activeSymbol, updatedTicker);
+            tickersMap = newMap;
+            tickersVersion = state.tickersVersion + 1;
+        }
+
+        return { currentPrice: price, priceChangePercent, tickersMap, tickersVersion };
+    }),
 
     setAccountData: (balance, positions) => set({
         balance,

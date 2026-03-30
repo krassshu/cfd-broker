@@ -36,12 +36,13 @@ export default function EditOrderModal({ isOpen, onClose, onSave, order }: EditO
     const [isSaving, setIsSaving] = useState(false);
 
     const tickersMap = useMarketStore((state) => state.tickersMap);
+    const tickersVersion = useMarketStore((state) => state.tickersVersion);
 
     const currentPrice = useMemo(() => {
         if (!order) return 0;
         const ticker = tickersMap.get(order.symbol);
         return ticker ? parseFloat(ticker.lastPrice) : 0;
-    }, [order, tickersMap]);
+    }, [order, tickersMap, tickersVersion]);
 
     // ── Initialize from existing order ─────────────────────────────
     useEffect(() => {

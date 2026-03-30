@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Globe } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -13,8 +13,11 @@ export default function ResetPasswordPage() {
     const [confirmPassword, setConfirmPassword] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
-    const [sessionReady, setSessionReady] = useState(false);
     const [verifying, setVerifying] = useState(true);
+    const [codeReady, setCodeReady] = useState(false);
+
+    /** Stores the PKCE code from the reset link — session is NOT created until form submit */
+    const resetCodeRef = useRef<string | null>(null);
 
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -23,21 +26,17 @@ export default function ResetPasswordPage() {
         const code = searchParams.get("code");
 
         if (code) {
-            const supabase = createClient();
-            supabase.auth.exchangeCodeForSession(code).then(({ error }: { error: Error | null }) => {
-                if (error) {
-                    router.replace("/login?error=Invalid or expired reset link");
-                } else {
-                    setSessionReady(true);
-                    setVerifying(false);
-                    window.history.replaceState({}, "", "/reset-password");
-                }
-            });
+            // Store the code but do NOT exchange it yet — no session is created
+            resetCodeRef.current = code;
+            setCodeReady(true);
+            setVerifying(false);
+            window.history.replaceState({}, "", "/reset-password");
         } else {
+            // No code in URL — check if user already has an active recovery session
             const supabase = createClient();
             supabase.auth.getUser().then(({ data: { user } }: { data: { user: unknown } }) => {
                 if (user) {
-                    setSessionReady(true);
+                    setCodeReady(true);
                     setVerifying(false);
                 } else {
                     router.replace("/login?error=No active password reset session");
@@ -47,7 +46,7 @@ export default function ResetPasswordPage() {
     }, [searchParams, router]);
 
     const isMatch = password === confirmPassword && password !== "";
-    const isReady = password.length >= 8 && isMatch && sessionReady;
+    const isReady = password.length >= 8 && isMatch && codeReady;
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -56,8 +55,21 @@ export default function ResetPasswordPage() {
         setError("");
         setLoading(true);
 
+        // Exchange code for session right before updating password — prevents premature login
+        if (resetCodeRef.current) {
+            const supabase = createClient();
+            const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(resetCodeRef.current);
+            if (exchangeError) {
+                setError("Reset link expired or is invalid. Please request a new one.");
+                setLoading(false);
+                return;
+            }
+            resetCodeRef.current = null;
+        }
+
         const formData = new FormData();
         formData.set("password", password);
+        formData.set("confirm", confirmPassword);
 
         const result = await updatePassword(formData);
 

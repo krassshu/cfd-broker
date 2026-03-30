@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 /** Allowed redirect targets after auth callback — prevents open redirect attacks */
-const SAFE_REDIRECTS = ['/market', '/login', '/market/settings'];
+const SAFE_REDIRECTS = ['/market', '/login', '/market/account', '/reset-password'];
 
 export async function GET(request: Request) {
     const { searchParams, origin } = new URL(request.url)

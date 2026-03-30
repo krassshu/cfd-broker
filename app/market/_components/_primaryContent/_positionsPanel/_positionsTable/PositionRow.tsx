@@ -53,11 +53,11 @@ export function PositionRow({ order, activeTab, tickersData, onClose, onEdit }: 
             <td className={`${cellClass} text-right`}>
                 <div className="flex flex-col items-end">
                     <span className={`${monoClass} text-foreground`}>{formatCurrency(order.entry_price)}</span>
-                    {activeTab === 'OPEN' && order.liquidation_price && (
-                        <span className="text-[9px] text-orange-500/80 font-mono">
-                            Liq: {formatCurrency(order.liquidation_price)}
-                        </span>
-                    )}
+                    {/*{activeTab === 'OPEN' && order.liquidation_price && (*/}
+                    {/*    <span className="text-[9px] text-orange-500/80 font-mono">*/}
+                    {/*        Liq: {formatCurrency(order.liquidation_price)}*/}
+                    {/*    </span>*/}
+                    {/*)}*/}
                 </div>
             </td>
             <td className={`${cellClass} text-right`}>

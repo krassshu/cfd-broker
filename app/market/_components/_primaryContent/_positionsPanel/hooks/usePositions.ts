@@ -18,6 +18,7 @@ export const usePositions = () => {
     const supabase = createClient();
 
     const tickersMap = useMarketStore((state) => state.tickersMap);
+    const tickersVersion = useMarketStore((state) => state.tickersVersion);
     const addNotification = useMarketStore((state) => state.addNotification);
     const bumpPositionsVersion = useMarketStore((state) => state.bumpPositionsVersion);
 
@@ -130,7 +131,7 @@ export const usePositions = () => {
         const promise = updateOrder(id, { stopLoss: sl, takeProfit: tp });
 
         toast.promise(promise, {
-            loading: 'Updating risk settings...',
+            loading: 'Updating risk account...',
             success: (res) => {
                 if (!res.success) throw new Error(res.message);
                 return "Order updated";
@@ -139,7 +140,8 @@ export const usePositions = () => {
         });
     };
 
-    const tickersData: BinanceTicker[] = useMemo(() => Array.from(tickersMap.values()), [tickersMap]);
+    // tickersVersion guarantees memo invalidation on every WebSocket batch
+    const tickersData: BinanceTicker[] = useMemo(() => Array.from(tickersMap.values()), [tickersMap, tickersVersion]);
 
     return {
         activeTab,

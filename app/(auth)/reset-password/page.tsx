@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Globe } from "lucide-react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { updatePassword, logout } from "@/app/auth/actions";
 import { PasswordStrength } from "@/app/(auth)/register/_components/PasswordStrength";
 import { createClient } from "@/lib/supabase/client";
@@ -14,39 +14,51 @@ export default function ResetPasswordPage() {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [verifying, setVerifying] = useState(true);
-    const [codeReady, setCodeReady] = useState(false);
+    const [sessionReady, setSessionReady] = useState(false);
 
-    /** Stores the PKCE code from the reset link — session is NOT created until form submit */
-    const resetCodeRef = useRef<string | null>(null);
-
-    const searchParams = useSearchParams();
     const router = useRouter();
 
     useEffect(() => {
-        const code = searchParams.get("code");
+        const supabase = createClient();
+        let redirectTimer: ReturnType<typeof setTimeout> | null = null;
 
-        if (code) {
-            // Store the code but do NOT exchange it yet — no session is created
-            resetCodeRef.current = code;
-            setCodeReady(true);
-            setVerifying(false);
-            window.history.replaceState({}, "", "/reset-password");
-        } else {
-            // No code in URL — check if user already has an active recovery session
-            const supabase = createClient();
-            supabase.auth.getUser().then(({ data: { user } }: { data: { user: unknown } }) => {
-                if (user) {
-                    setCodeReady(true);
-                    setVerifying(false);
-                } else {
-                    router.replace("/login?error=No active password reset session");
-                }
-            });
-        }
-    }, [searchParams, router]);
+        // Listen for auth state changes — handles both:
+        //  • Implicit flow: Supabase client auto-parses hash fragment tokens
+        //  • Callback flow: session already exists when page loads
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+            if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+                // Cancel the "no session" redirect if it was pending
+                if (redirectTimer) clearTimeout(redirectTimer);
+                setSessionReady(true);
+                setVerifying(false);
+            }
+        });
+
+        // Also check for existing session (e.g. arrived from /auth/callback which already exchanged the code)
+        supabase.auth.getUser().then(({ data: { user } }) => {
+            if (user) {
+                if (redirectTimer) clearTimeout(redirectTimer);
+                setSessionReady(true);
+                setVerifying(false);
+            } else {
+                // Give Supabase client time to process hash fragment tokens (implicit flow)
+                // before giving up and redirecting to login
+                redirectTimer = setTimeout(() => {
+                    if (!sessionReady) {
+                        router.replace("/login?error=Invalid or expired reset link. Please request a new one.");
+                    }
+                }, 3000);
+            }
+        });
+
+        return () => {
+            subscription.unsubscribe();
+            if (redirectTimer) clearTimeout(redirectTimer);
+        };
+    }, [router, sessionReady]);
 
     const isMatch = password === confirmPassword && password !== "";
-    const isReady = password.length >= 8 && isMatch && codeReady;
+    const isReady = password.length >= 8 && isMatch && sessionReady;
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -54,18 +66,6 @@ export default function ResetPasswordPage() {
 
         setError("");
         setLoading(true);
-
-        // Exchange code for session right before updating password — prevents premature login
-        if (resetCodeRef.current) {
-            const supabase = createClient();
-            const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(resetCodeRef.current);
-            if (exchangeError) {
-                setError("Reset link expired or is invalid. Please request a new one.");
-                setLoading(false);
-                return;
-            }
-            resetCodeRef.current = null;
-        }
 
         const formData = new FormData();
         formData.set("password", password);

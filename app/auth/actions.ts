@@ -97,9 +97,7 @@ export async function resetPasswordRequest(formData: FormData) {
     const origin = headerList.get('origin');
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${origin}/reset-password`,
-        // NOTE: Supabase redirects here with ?code=... which the client stores
-        // and only exchanges when the user submits the new password form.
+        redirectTo: `${origin}/auth/callback?next=/reset-password`,
     });
 
     if (error) {

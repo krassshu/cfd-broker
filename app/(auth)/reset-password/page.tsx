@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { updatePassword, logout } from "@/app/auth/actions";
 import { PasswordStrength } from "@/app/(auth)/register/_components/PasswordStrength";
 import { createClient } from "@/lib/supabase/client";
+import type { AuthChangeEvent } from "@supabase/supabase-js";
 
 export default function ResetPasswordPage() {
     const [password, setPassword] = useState("");
@@ -25,7 +26,7 @@ export default function ResetPasswordPage() {
         // Listen for auth state changes — handles both:
         //  • Implicit flow: Supabase client auto-parses hash fragment tokens
         //  • Callback flow: session already exists when page loads
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent) => {
             if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
                 // Cancel the "no session" redirect if it was pending
                 if (redirectTimer) clearTimeout(redirectTimer);
@@ -35,7 +36,7 @@ export default function ResetPasswordPage() {
         });
 
         // Also check for existing session (e.g. arrived from /auth/callback which already exchanged the code)
-        supabase.auth.getUser().then(({ data: { user } }) => {
+        supabase.auth.getUser().then(({ data: { user } }: { data: { user: unknown } }) => {
             if (user) {
                 if (redirectTimer) clearTimeout(redirectTimer);
                 setSessionReady(true);

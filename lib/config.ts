@@ -28,4 +28,3 @@ export const RATE_LIMIT_RESET = { max: 3, windowMs: 60_000 } as const;
 export const NAVBAR_HEIGHT_PX = 64;
 export const TICKER_STALE_TIME_MS = 60 * 1000;
 export const AUTH_TIMEOUT_MS = 5000;
-export const METRICS_DEBOUNCE_MS = 100;

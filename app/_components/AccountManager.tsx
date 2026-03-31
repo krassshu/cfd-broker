@@ -6,7 +6,7 @@ import { useMarketStore, Position } from "@/lib/store";
 import { closePosition } from "@/app/actions/trade";
 import { toast } from "sonner";
 
-/** Headless component: syncs account data from Supabase, recalculates metrics on tick, auto-closes positions on SL/TP or when available capital <= 0 */
+/** Syncs account data from Supabase, recalculates metrics on tick, auto-closes on SL/TP/margin call */
 export default function AccountManager() {
     const setAccountData = useMarketStore((state) => state.setAccountData);
     const updateBalance = useMarketStore((state) => state.updateBalance);
@@ -87,8 +87,7 @@ export default function AccountManager() {
         fetchAccountData();
     }, [positionsVersion, fetchAccountData]);
 
-    /** Recalculate account metrics synchronously on every tick/position/balance change.
-     *  The calculation is O(openPositions.length) which is tiny — no debounce needed. */
+    /** Recalculate equity/margin/available on every tick */
     useEffect(() => {
         if (tickersMap.size === 0) return;
         calculateAccountMetrics();
@@ -123,8 +122,7 @@ export default function AccountManager() {
             else if (tpHit) positionsToClose.push({ pos, reason: 'TAKE_PROFIT' });
         }
 
-        // Account-level margin call: when available capital drops to 0 or below,
-        // close positions starting from smallest volume to largest
+        // Margin call: close smallest positions first when available <= 0
         if (available <= 0 && positionsToClose.length === 0) {
             const sortedByVolume = [...openPositions]
                 .filter(pos => !processingIds.has(pos.id))

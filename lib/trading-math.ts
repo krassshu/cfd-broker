@@ -60,6 +60,7 @@ export function calculatePositionMargin(entryPrice: number, amount: number, leve
     return (entryPrice * amount) / leverage;
 }
 
+/** Derives the exit price needed to achieve a target P&L */
 export function calculateClosePriceFromPnL(
     side: TradeSide,
     entryPrice: number,
@@ -90,6 +91,7 @@ export function calculateSlPriceLimits(
     }
 }
 
+/** Returns min/max allowed TP price range for the given side */
 export function calculateTpPriceLimits(
     side: TradeSide,
     entryPrice: number,

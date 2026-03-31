@@ -2,6 +2,7 @@ import { createBrowserClient } from '@supabase/ssr'
 
 let supabaseClient: ReturnType<typeof createBrowserClient> | null = null;
 
+/** Returns the singleton browser-side Supabase client */
 export function createClient() {
     if (!supabaseClient) {
         supabaseClient = createBrowserClient(

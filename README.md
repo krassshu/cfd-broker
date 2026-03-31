@@ -1,8 +1,104 @@
-## 🗄️ Database Schema & Architecture
+# CryptoBroker
 
-The trading platform relies on a robust **PostgreSQL** architecture (via Supabase). The schema is designed for high-frequency CFD trading, focusing on financial integrity, leverage management, and strict data segregation using Row Level Security (RLS).
+Real-time cryptocurrency CFD trading platform. Trade 100+ crypto pairs with up to 50x leverage using a demo account with live Binance market data.
 
-### 🗺️ Entity Relationship Diagram (ERD)
+## Features
+
+**Real-Time Trading** — Live prices streamed via Binance WebSocket (batch ticker for all symbols + individual ticker for the active pair). Open long/short CFD positions with 50x leverage and configurable stop-loss/take-profit. Spread (0.03%) applied to execution prices. Atomic trade execution and settlement via Supabase RPCs.
+
+**Portfolio Management** — Live equity, used margin, available capital, and unrealized P&L recalculated on every price tick. Automatic SL/TP execution when price targets are hit. Margin call system closes positions (smallest first) when available capital drops to zero. Full position history with per-trade and per-symbol performance breakdown.
+
+**Charting** — TradingView Lightweight Charts with candlestick, line, area, and bar modes across seven timeframes (1m, 5m, 15m, 1h, 4h, 1d, 1w). OHLC data from the Binance Klines API.
+
+**Account & Auth** — Email/password authentication via Supabase Auth (PKCE flow). Password reset with secure callback handling. Demo account with configurable deposits (up to $100k). Account statistics dashboard with win rate, best/worst trade, volume, and symbol breakdown.
+
+**UI/UX** — Dark and light themes via CSS variables and `next-themes`. Favorites with optimistic updates. Symbol search with gainers/losers/favorites tabs. Toast notifications for trade events. Responsive layout with Tailwind CSS 4.
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 16 (App Router, Server Actions) |
+| UI | React 19, Tailwind CSS 4 |
+| State | Zustand 5 (with `persist` middleware for notifications) |
+| Backend | Supabase (Auth, Postgres, RLS, Realtime, RPCs) |
+| Market Data | Binance REST API + WebSocket streams |
+| Charts | TradingView Lightweight Charts |
+| Validation | Zod 4 |
+| Data Fetching | TanStack React Query |
+
+## Project Structure
+
+```
+app/
+  (auth)/                 Auth pages (login, register, forgot-password, reset-password)
+  auth/                   Auth callback route + server actions
+  actions/                Server actions
+    trade/                  execute-trade, close-position, update-order
+    account/                get-account-stats, add-demo-funds, change-password
+    favorites.ts            add/remove favorite symbols
+  market/                 Main trading dashboard
+    _components/
+      _symbols/             Symbol list, search, tabs, row
+      _primaryContent/
+        _chart/               TradingView chart + order panel
+        _positionsPanel/      Open/closed positions, account info, edit modal
+      _header/              Dashboard header
+  _components/            Headless components (AccountManager, MarketManager)
+  api/                    API routes (Binance ticker proxy)
+
+lib/
+  binance.ts              Binance REST helpers (ticker, klines)
+  config.ts               Constants (spread, leverage, rate limits, URLs)
+  trading-math.ts         P&L, margin, liquidation, SL/TP calculations
+  rate-limit.ts           In-memory sliding-window rate limiter
+  store.ts                Zustand store (market data, account state, notifications)
+  schemas.ts              Zod validation schemas
+  utils.ts                Formatting helpers
+  supabase/
+    client.ts               Browser-side Supabase client (singleton)
+    server.ts               Server-side Supabase client (cookie-based)
+    middleware.ts            Session refresh + auth routing
+```
+
+## Getting Started
+
+### Prerequisites
+
+Node.js 18+ and a Supabase project with the required tables, RPCs, and RLS policies (see Database section below).
+
+### Environment Variables
+
+Create a `.env.local` file:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+### Install & Run
+
+```bash
+npm install
+npm run dev
+```
+
+The app runs at `http://localhost:3000`.
+
+### Production Build
+
+```bash
+npm run build
+npm start
+```
+
+---
+
+## Database Schema & Architecture
+
+The platform uses PostgreSQL via Supabase, designed for financial integrity, leverage management, and strict data segregation with Row Level Security.
+
+### Entity Relationship Diagram
 
 ```mermaid
 erDiagram
@@ -39,66 +135,59 @@ erDiagram
         uuid id PK
         string symbol
     }
-
 ```
 
 ---
 
-### 🗃️ Table Reference
+### Table Reference
 
 #### 1. `profiles`
 
-**Role:** The single source of truth for the user's cash balance.
-
-* **Update Mechanism:** Automated via Database Triggers (see *Automation*).
+Single source of truth for the user's cash balance. Updated automatically via database triggers.
 
 | Column | Type | Description |
 | --- | --- | --- |
-| `id` | `uuid` (PK) | Primary Key. Links 1:1 with `auth.users`. |
-| `balance` | `numeric` | **Cash Balance.** Does not include unrealized PnL from open positions. |
+| `id` | `uuid` (PK) | Links 1:1 with `auth.users`. |
+| `balance` | `numeric` | Cash balance (excludes unrealized P&L). |
 | `created_at` | `timestamptz` | Account creation timestamp. |
 
 #### 2. `positions`
 
-**Role:** Stores active and historical CFD trades. The frontend `AccountManager` uses active rows (`status='OPEN'`) to calculate real-time **Equity** and **Free Margin**.
+Active and historical CFD trades. The frontend `AccountManager` uses rows with `status='OPEN'` to calculate real-time equity and free margin.
 
 | Column | Type | Description |
 | --- | --- | --- |
-| `id` | `uuid` (PK) | Unique Position ID. |
-| `user_id` | `uuid` (FK) | Owner of the position. |
-| `symbol` | `text` | Asset Pair (e.g., `ETHUSDT`). |
-| `side` | `text` | Direction: `'BUY'` (Long) or `'SELL'` (Short). |
-| `amount` | `numeric` | Size of the position in base asset. |
-| `entry_price` | `numeric` | Price at execution. |
-| `leverage` | `int` | Leverage multiplier (e.g., `20`, `50`, `100`). |
-| `margin` | `numeric` | **Collateral.** Calculated as `(amount * entry_price) / leverage`. |
+| `id` | `uuid` (PK) | Unique position ID. |
+| `user_id` | `uuid` (FK) | Owner. |
+| `symbol` | `text` | Asset pair (e.g., `ETHUSDT`). |
+| `side` | `text` | `'BUY'` (long) or `'SELL'` (short). |
+| `amount` | `numeric` | Size in base asset. |
+| `entry_price` | `numeric` | Execution price at open. |
+| `leverage` | `int` | Leverage multiplier. |
+| `margin` | `numeric` | Locked collateral: `(amount * entry_price) / leverage`. |
 | `liquidation_price` | `numeric` | Stop-out price calculated at entry. |
-| `take_profit` | `numeric` | (Optional) Auto-close target. |
-| `stop_loss` | `numeric` | (Optional) Max loss target. |
+| `take_profit` | `numeric` | Auto-close target (optional). |
+| `stop_loss` | `numeric` | Max loss target (optional). |
 | `status` | `text` | `'OPEN'` or `'CLOSED'`. |
-| `pnl` | `numeric` | Realized Profit/Loss (only populated when closed). |
-| `exit_price` | `numeric` | Execution price at closure. |
+| `pnl` | `numeric` | Realized P&L (populated on close). |
+| `exit_price` | `numeric` | Execution price at close. |
 
 #### 3. `transactions`
 
-**Role:** An immutable ledger of all financial movements.
-
-* **Security:** Read-only for users. Only the system can insert rows.
+Immutable ledger of all financial movements. Read-only for users — only the system inserts rows.
 
 | Column | Type | Description |
 | --- | --- | --- |
-| `id` | `uuid` (PK) | Unique Transaction ID. |
+| `id` | `uuid` (PK) | Unique transaction ID. |
 | `user_id` | `uuid` (FK) | Owner. |
-| `amount` | `numeric` | Change value. Negative for loss/withdraw, positive for profit/deposit. |
-| `type` | `text` | Enum: `'DEPOSIT'`, `'WITHDRAWAL'`, `'REALIZED_PNL'`, `'FUNDING_FEE'`. |
-| `reference_id` | `uuid` | (Optional) ID of the `position` that generated this event. |
+| `amount` | `numeric` | Negative for loss/withdraw, positive for profit/deposit. |
+| `type` | `text` | `'DEPOSIT'`, `'WITHDRAWAL'`, `'REALIZED_PNL'`, `'FUNDING_FEE'`. |
+| `reference_id` | `uuid` | Position ID that generated this event (optional). |
 | `created_at` | `timestamptz` | Ledger timestamp. |
 
 #### 4. `favorites`
 
-**Role:** User watchlist preferences.
-
-* **Constraint:** A user cannot favorite the same symbol twice (`unique(user_id, symbol)`).
+User watchlist. Unique constraint on `(user_id, symbol)`.
 
 | Column | Type | Description |
 | --- | --- | --- |
@@ -108,41 +197,37 @@ erDiagram
 
 ---
 
-### 🔐 Security & RLS (Row Level Security)
+### Security & RLS
 
-The database enforces strict data segregation using PostgreSQL RLS policies. No user can access another user's financial data.
+Row Level Security ensures no user can access another user's financial data:
 
-* **`profiles`**: Users can view their own profile. Balance updates are restricted to system triggers.
-* **`positions`**: Users can full CRUD (Create, Read, Update, Delete) their *own* positions.
-* **`transactions`**: Users have **Read-Only** access to their own history.
-* **`favorites`**: Full CRUD access for the owner.
+- **`profiles`** — Users can view their own profile. Balance updates are restricted to system triggers.
+- **`positions`** — Full CRUD on own positions only.
+- **`transactions`** — Read-only access to own history.
+- **`favorites`** — Full CRUD for the owner.
 
 ---
 
-### ⚙️ Automation & Triggers
+### Automation & Triggers
 
-To ensure financial consistency, the `balance` field in `profiles` is never updated manually by the client application.
+The `balance` field in `profiles` is never updated directly by the client. Instead, a database trigger keeps it consistent:
 
-**Trigger: `on_transaction_created**`
+**Trigger: `on_transaction_created`** — Fires `AFTER INSERT` on `transactions` and atomically updates the user's balance:
 
-* **Event:** `AFTER INSERT` on `public.transactions`
-* **Logic:**
 ```plpgsql
 UPDATE public.profiles
 SET balance = balance + NEW.amount
 WHERE id = NEW.user_id;
-
 ```
 
-
-* **Benefit:** Eliminates race conditions and ensures the profile balance is always the mathematical sum of the transaction history.
+This eliminates race conditions and guarantees balance is always the sum of the transaction history.
 
 ---
 
-### 🛠️ Installation (SQL)
+### SQL Setup
 
 <details>
-<summary>Click to view the full SQL Setup Script</summary>
+<summary>Full SQL setup script</summary>
 
 ```sql
 -- 1. Enable UUID extension
@@ -221,7 +306,10 @@ $$ language plpgsql security definer;
 create trigger on_transaction_created
 after insert on public.transactions
 for each row execute function public.handle_new_transaction();
-
 ```
 
 </details>
+
+## License
+
+Private project.

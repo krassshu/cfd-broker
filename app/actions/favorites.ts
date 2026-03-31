@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 
+/** Persists a symbol to the user's favorites list */
 export async function addFavoriteAction(symbol: string) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -15,6 +16,7 @@ export async function addFavoriteAction(symbol: string) {
     return { success: true, message: "Favorite added" };
 }
 
+/** Removes a symbol from the user's favorites list */
 export async function removeFavoriteAction(symbol: string) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();

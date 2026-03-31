@@ -22,6 +22,7 @@ if (typeof cleanupTimer?.unref === 'function') {
     cleanupTimer.unref();
 }
 
+/** Sliding-window rate limiter — returns false when the limit is exceeded */
 export function rateLimit(key: string, limit: number, windowMs: number): boolean {
     const now = Date.now();
 

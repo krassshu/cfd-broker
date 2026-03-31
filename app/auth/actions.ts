@@ -16,6 +16,7 @@ function validateEmail(email: string): string | null {
     return null;
 }
 
+/** Authenticates user with email/password and redirects to /market */
 export async function login(formData: FormData) {
     const email = (formData.get('email') as string)?.trim();
     const password = formData.get('password') as string;
@@ -39,6 +40,7 @@ export async function login(formData: FormData) {
     redirect('/market');
 }
 
+/** Registers a new user and sends email confirmation */
 export async function signup(formData: FormData) {
     const email = (formData.get('email') as string)?.trim();
     const password = formData.get('password') as string;
@@ -75,6 +77,7 @@ export async function signup(formData: FormData) {
     return { success: true, message: 'Check your email for a confirmation link' };
 }
 
+/** Signs out the current user and redirects to /login */
 export async function logout() {
     const supabase = await createClient();
     await supabase.auth.signOut();
@@ -82,6 +85,7 @@ export async function logout() {
     redirect('/login');
 }
 
+/** Sends a password reset email (always returns success to prevent enumeration) */
 export async function resetPasswordRequest(formData: FormData) {
     const email = (formData.get('email') as string)?.trim();
 
@@ -108,6 +112,7 @@ export async function resetPasswordRequest(formData: FormData) {
     return { success: true, message: 'If an account exists, a reset link has been sent' };
 }
 
+/** Sets a new password for the authenticated user and signs them out */
 export async function updatePassword(formData: FormData) {
     const password = formData.get('password') as string;
     const confirmPassword = formData.get('confirm') as string;

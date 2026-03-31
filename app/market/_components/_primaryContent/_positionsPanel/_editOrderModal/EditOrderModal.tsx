@@ -44,7 +44,6 @@ export default function EditOrderModal({ isOpen, onClose, onSave, order }: EditO
         return ticker ? parseFloat(ticker.lastPrice) : 0;
     }, [order, tickersMap, tickersVersion]);
 
-    // ── Initialize from existing order ─────────────────────────────
     useEffect(() => {
         if (!order) return;
 
@@ -70,7 +69,6 @@ export default function EditOrderModal({ isOpen, onClose, onSave, order }: EditO
         setTpActiveField(null);
     }, [order]);
 
-    // ── Escape key ─────────────────────────────────────────────────
     useEffect(() => {
         if (!isOpen) return;
         const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -78,7 +76,6 @@ export default function EditOrderModal({ isOpen, onClose, onSave, order }: EditO
         return () => document.removeEventListener('keydown', handleKey);
     }, [isOpen, onClose]);
 
-    // ── SL handlers ──────────────────────────────────────────────
     const handleSlPriceChange = useCallback((val: string) => {
         setSlPrice(val);
         setSlActiveField('price');
@@ -109,7 +106,6 @@ export default function EditOrderModal({ isOpen, onClose, onSave, order }: EditO
         }
     }, [order]);
 
-    // ── TP handlers ──────────────────────────────────────────────
     const handleTpPriceChange = useCallback((val: string) => {
         setTpPrice(val);
         setTpActiveField('price');
@@ -140,7 +136,6 @@ export default function EditOrderModal({ isOpen, onClose, onSave, order }: EditO
         }
     }, [order]);
 
-    // ── Price limits ───────────────────────────────────────────────
     const limits = useMemo(() => {
         if (!order || currentPrice <= 0) return null;
         const liqPrice = order.liquidation_price || 0;
@@ -159,7 +154,6 @@ export default function EditOrderModal({ isOpen, onClose, onSave, order }: EditO
         };
     }, [order, currentPrice]);
 
-    // ── Validation ─────────────────────────────────────────────────
     const validation = useMemo(() => {
         if (!order) return { slError: '', tpError: '' };
 

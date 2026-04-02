@@ -95,7 +95,7 @@ export const usePositions = () => {
             return o;
         }));
 
-        const promise = closePosition(id);
+        const promise = closePosition(id, estimatedPrice);
 
         toast.promise(promise, {
             loading: 'Closing position...',

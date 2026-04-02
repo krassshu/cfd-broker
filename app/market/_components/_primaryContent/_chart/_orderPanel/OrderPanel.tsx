@@ -53,7 +53,7 @@ export default function OrderPanel() {
 
         setIsPending(true);
 
-        const tradePromise = executeTrade(activeSymbol, amount, side);
+        const tradePromise = executeTrade(activeSymbol, amount, side, currentPrice);
 
         toast.promise(tradePromise, {
             loading: `Opening ${side} (50x)...`,

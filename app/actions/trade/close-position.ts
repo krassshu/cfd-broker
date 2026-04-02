@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from "@/lib/supabase/server";
-import { getTicker } from "@/lib/binance";
+import { getTickerPrice } from "@/lib/binance";
 import { calculatePositionPnL } from "@/lib/trading-math";
 import { revalidatePath } from "next/cache";
 import { ClosePositionSchema, parseSchema } from "@/lib/schemas";
@@ -9,7 +9,7 @@ import { RATE_LIMIT_CLOSE, type TradeSide } from "@/lib/config";
 import { rateLimit } from "@/lib/rate-limit";
 
 /** Closes a position at current market price via atomic RPC (validates, calculates P&L, settles) */
-export async function closePosition(positionId: string) {
+export async function closePosition(positionId: string, clientPrice?: number) {
     const validation = parseSchema(ClosePositionSchema, { positionId });
     if (!validation.success) return { success: false, message: validation.message };
 
@@ -31,13 +31,18 @@ export async function closePosition(positionId: string) {
 
         if (!position) return { success: false, message: "Position not found" };
 
-        const tickers = await getTicker();
-        const ticker = tickers.find(t => t.symbol === position.symbol);
-        if (!ticker) return { success: false, message: "Market unavailable" };
+        // Try server-side price first, fall back to client price
+        const serverPrice = await getTickerPrice(position.symbol);
 
-        const currentPrice = parseFloat(ticker.lastPrice);
-        if (isNaN(currentPrice) || currentPrice <= 0) {
-            return { success: false, message: "Invalid market price. Please try again." };
+        let currentPrice: number;
+
+        if (serverPrice && serverPrice > 0) {
+            currentPrice = serverPrice;
+        } else if (clientPrice && clientPrice > 0) {
+            console.warn(`Binance API unavailable for ${position.symbol}, using client price: ${clientPrice}`);
+            currentPrice = clientPrice;
+        } else {
+            return { success: false, message: "Market data unavailable. Please try again." };
         }
 
         const pnl = calculatePositionPnL(

@@ -2,14 +2,17 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { calculateExecutionPrice } from "@/lib/trading-math";
-import { getTicker } from "@/lib/binance";
+import { getTickerPrice } from "@/lib/binance";
 import { revalidatePath } from "next/cache";
 import { TradeSchema, parseSchema } from "@/lib/schemas";
 import { LEVERAGE, RATE_LIMIT_TRADE, type TradeSide } from "@/lib/config";
 import { rateLimit } from "@/lib/rate-limit";
 
+/** Maximum allowed deviation (0.5%) between client price and server price */
+const MAX_PRICE_DEVIATION = 0.005;
+
 /** Opens a new leveraged position via atomic RPC (applies spread, checks margin, creates position) */
-export async function executeTrade(symbol: string, amount: number, side: TradeSide) {
+export async function executeTrade(symbol: string, amount: number, side: TradeSide, clientPrice?: number) {
     const validation = parseSchema(TradeSchema, { symbol, amount, side });
     if (!validation.success) return { success: false, message: validation.message };
 
@@ -22,13 +25,29 @@ export async function executeTrade(symbol: string, amount: number, side: TradeSi
     }
 
     try {
-        const tickers = await getTicker();
-        const targetTicker = tickers.find(t => t.symbol === symbol);
-        if (!targetTicker) return { success: false, message: "Asset unavailable" };
+        // Try to get the server-side price from Binance (with fallback endpoints)
+        const serverPrice = await getTickerPrice(symbol);
 
-        const currentRealPrice = parseFloat(targetTicker.lastPrice);
-        if (isNaN(currentRealPrice) || currentRealPrice <= 0) {
-            return { success: false, message: "Invalid market price. Please try again." };
+        let currentRealPrice: number;
+
+        if (serverPrice && serverPrice > 0) {
+            // Server price available — use it as source of truth
+            currentRealPrice = serverPrice;
+        } else if (clientPrice && clientPrice > 0) {
+            // All Binance endpoints failed — fall back to client-provided price
+            console.warn(`Binance API unavailable for ${symbol}, using client price: ${clientPrice}`);
+            currentRealPrice = clientPrice;
+        } else {
+            return { success: false, message: "Market data unavailable. Please try again." };
+        }
+
+        // If both prices available, validate client price isn't stale/manipulated
+        if (serverPrice && clientPrice && clientPrice > 0) {
+            const deviation = Math.abs(serverPrice - clientPrice) / serverPrice;
+            if (deviation > MAX_PRICE_DEVIATION) {
+                // Price moved significantly — use server price but don't reject
+                console.warn(`Price deviation ${(deviation * 100).toFixed(2)}% for ${symbol}: server=${serverPrice}, client=${clientPrice}`);
+            }
         }
 
         const { executionPrice, requiredMargin, liquidationPrice } = calculateExecutionPrice(currentRealPrice, side, amount);

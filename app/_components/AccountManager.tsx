@@ -153,7 +153,9 @@ export default function AccountManager() {
                 toast.error(title, { description });
 
                 try {
-                    await closePosition(pos.id);
+                    const ticker = tickersMap.get(pos.symbol);
+                    const clientPrice = ticker ? parseFloat(ticker.lastPrice) : undefined;
+                    await closePosition(pos.id, clientPrice);
                     // After closing, re-fetch to update available capital
                     // If available is restored above 0, remaining positions survive
                     break; // Close one at a time, let metrics recalculate

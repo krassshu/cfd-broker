@@ -1,4 +1,4 @@
-import { SPREAD_RATE, BINANCE_TICKER_URL, BINANCE_KLINES_URL } from "@/lib/config";
+import { SPREAD_RATE, BINANCE_REST_BASES, BINANCE_KLINES_URL } from "@/lib/config";
 
 export interface BinanceTicker {
     symbol: string;
@@ -15,25 +15,35 @@ export interface CandlestickData {
     close: number;
 }
 
-/** Fetches all 24h ticker data from Binance (cached 30s via Next.js) */
+/** Fetches all 24h ticker data from Binance with automatic fallback across mirror endpoints */
 export async function getBinanceData(): Promise<BinanceTicker[]> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    let lastError: Error | null = null;
 
-    try {
-        const response = await fetch(BINANCE_TICKER_URL, {
-            next: { revalidate: 30 },
-            signal: controller.signal,
-        });
+    for (const base of BINANCE_REST_BASES) {
+        const url = `${base}/ticker/24hr`;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
 
-        if (!response.ok) {
-            throw new Error(`Binance API Error: ${response.statusText}`);
+        try {
+            const response = await fetch(url, {
+                next: { revalidate: 30 },
+                signal: controller.signal,
+            });
+
+            if (!response.ok) {
+                throw new Error(`Binance API Error (${response.status}) from ${base}`);
+            }
+
+            return await response.json();
+        } catch (err) {
+            lastError = err instanceof Error ? err : new Error(String(err));
+            // Continue to next fallback endpoint
+        } finally {
+            clearTimeout(timeout);
         }
-
-        return await response.json();
-    } finally {
-        clearTimeout(timeout);
     }
+
+    throw lastError ?? new Error('All Binance API endpoints failed');
 }
 
 /** Returns only USDT-paired tickers with essential fields */
@@ -48,6 +58,30 @@ export async function getTicker(): Promise<BinanceTicker[]> {
             priceChangePercent: ticker.priceChangePercent,
             quoteVolume: ticker.quoteVolume,
         }));
+}
+
+/** Fetches a single ticker price — tries all endpoints, returns null on total failure */
+export async function getTickerPrice(symbol: string): Promise<number | null> {
+    for (const base of BINANCE_REST_BASES) {
+        const url = `${base}/ticker/price?symbol=${encodeURIComponent(symbol)}`;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+
+        try {
+            const response = await fetch(url, { signal: controller.signal, cache: 'no-store' });
+            if (!response.ok) continue;
+
+            const data = await response.json();
+            const price = parseFloat(data.price);
+            if (!isNaN(price) && price > 0) return price;
+        } catch {
+            // Try next endpoint
+        } finally {
+            clearTimeout(timeout);
+        }
+    }
+
+    return null;
 }
 
 const VALID_INTERVALS = new Set([

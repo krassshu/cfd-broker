@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { Bell } from "lucide-react";
+import { Bell, Calendar } from "lucide-react";
 import { useMarketStore } from "@/lib/store";
 
 function timeAgo(timestamp: number): string {
@@ -19,6 +19,7 @@ export default function Notifications() {
     const notifications = useMarketStore((s) => s.notifications);
     const markAllAsRead = useMarketStore((s) => s.markAllAsRead);
     const clearNotifications = useMarketStore((s) => s.clearNotifications);
+    const openCalendarWithHighlight = useMarketStore((s) => s.openCalendarWithHighlight);
 
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -40,6 +41,13 @@ export default function Notifications() {
     }, []);
 
     const unreadCount = notifications.filter(n => !n.read).length;
+
+    function handleNotificationClick(notif: typeof notifications[0]) {
+        if (notif.type === 'calendar' && notif.meta?.eventId) {
+            openCalendarWithHighlight(notif.meta.eventId);
+            setIsOpen(false);
+        }
+    }
 
     return (
         <div className="relative" ref={dropdownRef}>
@@ -91,11 +99,20 @@ export default function Notifications() {
                                 {notifications.map(notif => (
                                     <div
                                         key={notif.id}
-                                        className={`p-4 hover:bg-muted/10 transition-colors cursor-pointer flex flex-col gap-1.5 ${!notif.read ? 'border-l-2 border-l-primary' : 'opacity-60'}`}
+                                        onClick={() => handleNotificationClick(notif)}
+                                        className={`p-4 hover:bg-muted/10 transition-colors flex flex-col gap-1.5
+                                            ${!notif.read ? 'border-l-2 border-l-primary' : 'opacity-60'}
+                                            ${notif.type === 'calendar' ? 'cursor-pointer' : 'cursor-default'}
+                                        `}
                                     >
-                                        <p className="text-sm text-foreground leading-snug">
-                                            {notif.message}
-                                        </p>
+                                        <div className="flex items-start gap-2">
+                                            {notif.type === 'calendar' && (
+                                                <Calendar className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+                                            )}
+                                            <p className="text-sm text-foreground leading-snug">
+                                                {notif.message}
+                                            </p>
+                                        </div>
                                         <span className="text-[10px] text-muted-foreground font-mono">
                                             {timeAgo(notif.timestamp)}
                                         </span>

@@ -15,6 +15,8 @@ export interface TradeNotification {
     message: string;
     timestamp: number;
     read: boolean;
+    type?: 'trade' | 'calendar';
+    meta?: { eventId?: string };
 }
 
 export interface Position {
@@ -47,11 +49,30 @@ interface MarketState {
     positionsVersion: number;
     notifications: TradeNotification[];
     wsConnected: boolean;
+    calendarSubscriptions: string[];
+    notifiedEventIds: string[];
+    highlightEventId: string | null;
+    calendarShouldOpen: boolean;
+    // Persisted calendar filters
+    calendarSelectedCurrencies: string[];
+    calendarSelectedImpacts: string[];
+    calendarCustomDateFrom: string | null;
+    calendarCustomDateTo: string | null;
     setWsConnected: (connected: boolean) => void;
     bumpPositionsVersion: () => void;
     addNotification: (message: string) => void;
+    addCalendarNotification: (message: string, eventId: string) => void;
     markAllAsRead: () => void;
     clearNotifications: () => void;
+    addCalendarSubscription: (eventId: string) => void;
+    removeCalendarSubscription: (eventId: string) => void;
+    markEventNotified: (eventId: string) => void;
+    openCalendarWithHighlight: (eventId: string) => void;
+    clearCalendarHighlight: () => void;
+    cleanExpiredSubscriptions: () => void;
+    setCalendarSelectedCurrencies: (currencies: string[]) => void;
+    setCalendarSelectedImpacts: (impacts: string[]) => void;
+    setCalendarCustomDateRange: (from: string | null, to: string | null) => void;
     setInitialMarketData: (data: BinanceTicker[]) => void;
     updateTickersBatch: (tickers: Array<{ s: string; c: string; P: string }>) => void;
     setActiveSymbol: (symbol: string) => void;
@@ -81,6 +102,14 @@ export const useMarketStore = create<MarketState>()(persist((set) => ({
     positionsVersion: 0,
     notifications: [],
     wsConnected: false,
+    calendarSubscriptions: [],
+    notifiedEventIds: [],
+    highlightEventId: null,
+    calendarShouldOpen: false,
+    calendarSelectedCurrencies: [],
+    calendarSelectedImpacts: ["high", "medium", "low"],
+    calendarCustomDateFrom: null,
+    calendarCustomDateTo: null,
 
     setWsConnected: (connected) => set({ wsConnected: connected }),
 
@@ -88,7 +117,14 @@ export const useMarketStore = create<MarketState>()(persist((set) => ({
 
     addNotification: (message) => set((state) => ({
         notifications: [
-            { id: crypto.randomUUID(), message, timestamp: Date.now(), read: false },
+            { id: crypto.randomUUID(), message, timestamp: Date.now(), read: false, type: 'trade' as const },
+            ...state.notifications
+        ].slice(0, 50)
+    })),
+
+    addCalendarNotification: (message, eventId) => set((state) => ({
+        notifications: [
+            { id: crypto.randomUUID(), message, timestamp: Date.now(), read: false, type: 'calendar' as const, meta: { eventId } },
             ...state.notifications
         ].slice(0, 50)
     })),
@@ -98,6 +134,64 @@ export const useMarketStore = create<MarketState>()(persist((set) => ({
     })),
 
     clearNotifications: () => set({ notifications: [] }),
+
+    addCalendarSubscription: (eventId) => set((state) => ({
+        calendarSubscriptions: state.calendarSubscriptions.includes(eventId)
+            ? state.calendarSubscriptions
+            : [...state.calendarSubscriptions, eventId]
+    })),
+
+    removeCalendarSubscription: (eventId) => set((state) => ({
+        calendarSubscriptions: state.calendarSubscriptions.filter(id => id !== eventId)
+    })),
+
+    markEventNotified: (eventId) => set((state) => ({
+        notifiedEventIds: state.notifiedEventIds.includes(eventId)
+            ? state.notifiedEventIds
+            : [...state.notifiedEventIds, eventId]
+    })),
+
+    openCalendarWithHighlight: (eventId) => set({
+        highlightEventId: eventId,
+        calendarShouldOpen: true,
+    }),
+
+    clearCalendarHighlight: () => set({
+        highlightEventId: null,
+        calendarShouldOpen: false,
+    }),
+
+    cleanExpiredSubscriptions: () => set((state) => {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
+        const extractDate = (id: string): Date | null => {
+            // IDs: jb_<ISO date>_<index> or ff_<ISO date>_<index>
+            const parts = id.split('_');
+            if (parts.length < 3) return null;
+            const dateStr = parts.slice(1, -1).join('_');
+            const d = new Date(dateStr);
+            return isNaN(d.getTime()) ? null : d;
+        };
+
+        const validSubs = state.calendarSubscriptions.filter(id => {
+            const date = extractDate(id);
+            if (!date) return true; // keep if unparseable
+            return date >= todayStart;
+        });
+
+        const validNotified = state.notifiedEventIds.filter(id => {
+            const date = extractDate(id);
+            if (!date) return false; // discard stale notified IDs
+            return date >= todayStart;
+        });
+
+        return { calendarSubscriptions: validSubs, notifiedEventIds: validNotified };
+    }),
+
+    setCalendarSelectedCurrencies: (currencies) => set({ calendarSelectedCurrencies: currencies }),
+    setCalendarSelectedImpacts: (impacts) => set({ calendarSelectedImpacts: impacts }),
+    setCalendarCustomDateRange: (from, to) => set({ calendarCustomDateFrom: from, calendarCustomDateTo: to }),
 
     /** Populates tickersMap from initial API fetch and sets active symbol price */
     setInitialMarketData: (data) => {
@@ -229,5 +323,13 @@ export const useMarketStore = create<MarketState>()(persist((set) => ({
     })
 }), {
     name: 'cfd-notifications',
-    partialize: (state) => ({ notifications: state.notifications }),
+    partialize: (state) => ({
+        notifications: state.notifications,
+        calendarSubscriptions: state.calendarSubscriptions,
+        notifiedEventIds: state.notifiedEventIds,
+        calendarSelectedCurrencies: state.calendarSelectedCurrencies,
+        calendarSelectedImpacts: state.calendarSelectedImpacts,
+        calendarCustomDateFrom: state.calendarCustomDateFrom,
+        calendarCustomDateTo: state.calendarCustomDateTo,
+    }),
 }))

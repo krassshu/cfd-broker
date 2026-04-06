@@ -6,18 +6,30 @@ import UserDropDown from "@/app/market/_components/_navbar/_userDropDown/UserDro
 import { useMarketStore } from "@/lib/store";
 import Notifications from "@/app/market/_components/_navbar/_notifications/Notifications";
 import ConnectionStatus from "@/app/market/_components/_navbar/ConnectionStatus";
+import EconomicCalendar from "@/app/market/_components/_navbar/_economicCalendar/EconomicCalendar";
+import { useCalendarNotifications } from "@/app/market/_components/_navbar/_economicCalendar/useCalendarNotifications";
+import NavbarClock from "@/app/market/_components/_navbar/NavbarClock";
 
 export default function Navbar() {
     const equity = useMarketStore((state) => state.equity);
 
+    // Background polling for calendar event notifications (runs even when calendar is closed)
+    useCalendarNotifications();
+
     return (
         <nav className="flex items-center justify-between bg-card px-3 md:px-6 h-14 md:h-16 border-b border-border shadow-sm transition-colors duration-300">
-            <div className="flex items-center">
+            <div className="flex items-center gap-1 md:gap-3">
                 <Link href="/" className="flex items-center gap-2 text-lg md:text-xl font-bold tracking-tight text-foreground select-none hover:opacity-80 transition-opacity">
                     <Globe className="w-5 h-5 text-primary" />
                     <span>Crypto<span className="text-primary">Broker</span></span>
                 </Link>
+                <span className="w-px h-5 bg-border/50 hidden md:block" />
+                <EconomicCalendar />
             </div>
+
+            {/* Center — clock */}
+            <NavbarClock />
+
             <div className="flex items-center gap-2 md:gap-6">
                 <Notifications/>
                 <ConnectionStatus />

@@ -32,6 +32,7 @@ export interface PositionsTableProps {
     tickersData: BinanceTicker[] | undefined;
     onClose: (id: string, symbol: string) => void;
     onEdit: (id: string) => void;
+    onSymbolClick: (symbol: string) => void;
 }
 
 export interface PositionRowProps {
@@ -40,4 +41,5 @@ export interface PositionRowProps {
     tickersData?: BinanceTicker[];
     onClose: (id: string, symbol: string) => void;
     onEdit: (id: string) => void;
+    onSymbolClick: (symbol: string) => void;
 }

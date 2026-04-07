@@ -4,8 +4,15 @@ import { usePositions } from "./hooks/usePositions";
 import { PositionsTabs } from "./_positionsTabs/PositionsTabs";
 import { PositionsTable } from "./_positionsTable/PositionsTable";
 import EditOrderModal from "./_editOrderModal/EditOrderModal";
+import { useMarketStore } from "@/lib/store";
+import { useCallback } from "react";
 
 export default function PositionsPanel() {
+    const setActiveSymbol = useMarketStore((s) => s.setActiveSymbol);
+
+    const handleSymbolClick = useCallback((symbol: string) => {
+        setActiveSymbol(symbol);
+    }, [setActiveSymbol]);
 
     const {
         activeTab,
@@ -36,6 +43,7 @@ export default function PositionsPanel() {
                 isLoading={isLoading}
                 onClose={handleClose}
                 onEdit={openEditModal}
+                onSymbolClick={handleSymbolClick}
             />
             <EditOrderModal
                 isOpen={isEditModalOpen}

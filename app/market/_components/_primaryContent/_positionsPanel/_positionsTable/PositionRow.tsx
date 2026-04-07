@@ -5,7 +5,7 @@ import { PositionRowProps } from "@/app/market/_components/_primaryContent/_posi
 import CryptoIcon from "@/app/market/_components/_shared/CryptoIcon";
 
 /** Single position table row — shows live P&L for open positions, stored P&L for history */
-export function PositionRow({ order, activeTab, tickersData, onClose, onEdit }: PositionRowProps) {
+export function PositionRow({ order, activeTab, tickersData, onClose, onEdit, onSymbolClick }: PositionRowProps) {
     const cleanSymbol = order.symbol.replace('USDT', '');
 
     const ticker = tickersData?.find(t => t.symbol === order.symbol);
@@ -36,13 +36,17 @@ export function PositionRow({ order, activeTab, tickersData, onClose, onEdit }: 
     return (
         <tr className="hover:bg-muted/5 transition-colors group border-b border-border/30 last:border-0 text-xs">
             <td className={cellClass}>
-                <div className="flex items-center gap-3">
+                <button
+                    onClick={() => onSymbolClick(order.symbol)}
+                    className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
+                    title={`Show ${cleanSymbol} on chart`}
+                >
                     <CryptoIcon symbol={order.symbol} size={24} />
-                    <div className="flex flex-col">
-                        <span className="font-bold text-foreground leading-none">{cleanSymbol}</span>
+                    <div className="flex flex-col text-left">
+                        <span className="font-bold text-foreground leading-none hover:text-primary transition-colors">{cleanSymbol}</span>
                         <span className="text-[9px] text-yellow-500 font-bold mt-0.5">{order.leverage}x</span>
                     </div>
-                </div>
+                </button>
             </td>
 
             <td className={`${cellClass} text-center`}>

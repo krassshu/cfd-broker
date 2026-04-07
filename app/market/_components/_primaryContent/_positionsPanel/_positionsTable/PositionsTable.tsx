@@ -12,9 +12,10 @@ interface PositionsTableProps {
     isLoading?: boolean;
     onClose: (id: string, symbol: string) => void;
     onEdit: (id: string) => void;
+    onSymbolClick: (symbol: string) => void;
 }
 
-export const PositionsTable = ({ orders, activeTab, tickersData, isLoading, onClose, onEdit }: PositionsTableProps) => {
+export const PositionsTable = ({ orders, activeTab, tickersData, isLoading, onClose, onEdit, onSymbolClick }: PositionsTableProps) => {
     return (
         <div className="flex-1 overflow-auto custom-scrollbar">
             <table className="w-full min-w-[800px] text-left border-collapse">
@@ -53,6 +54,7 @@ export const PositionsTable = ({ orders, activeTab, tickersData, isLoading, onCl
                             tickersData={tickersData}
                             onClose={onClose}
                             onEdit={onEdit}
+                            onSymbolClick={onSymbolClick}
                         />
                     ))
                 )}

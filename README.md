@@ -8,7 +8,9 @@ Real-time cryptocurrency CFD trading platform. Trade 100+ crypto pairs with up t
 
 **Portfolio Management** — Live equity, used margin, available capital, and unrealized P&L recalculated on every price tick. Automatic SL/TP execution when price targets are hit. Margin call system closes positions (smallest first) when available capital drops to zero. Full position history with per-trade and per-symbol performance breakdown.
 
-**Charting** — TradingView Lightweight Charts with candlestick, line, area, and bar modes across seven timeframes (1m, 5m, 15m, 1h, 4h, 1d, 1w). OHLC data from the Binance Klines API.
+**Charting** — TradingView Lightweight Charts with candlestick, line, area, and bar modes across seven timeframes (1m, 5m, 15m, 1h, 4h, 1d, 1w). OHLC data from the Binance Klines API. Click any open position's symbol to instantly switch the chart to that pair.
+
+**Economic Calendar** — Real-time macroeconomic events powered by RapidAPI (HorizonFX). Shows event name, country, currency, impact level (High/Medium/Low), and actual/forecast/previous values. Grouped currency filters (Major, Commodity, Emerging), impact filters, and date range presets (Yesterday through Next Week) plus a custom date picker with calendar UI. All filter selections persist in localStorage via Zustand. Server-side cache (30 min) keeps API usage well within the free tier (~500 req/month).
 
 **Account & Auth** — Email/password authentication via Supabase Auth (PKCE flow). Password reset with secure callback handling. Demo account with configurable deposits (up to $100k). Account statistics dashboard with win rate, best/worst trade, volume, and symbol breakdown.
 
@@ -20,9 +22,10 @@ Real-time cryptocurrency CFD trading platform. Trade 100+ crypto pairs with up t
 |-------|-----------|
 | Framework | Next.js 16 (App Router, Server Actions) |
 | UI | React 19, Tailwind CSS 4 |
-| State | Zustand 5 (with `persist` middleware for notifications) |
+| State | Zustand 5 (with `persist` middleware for notifications & calendar filters) |
 | Backend | Supabase (Auth, Postgres, RLS, Realtime, RPCs) |
 | Market Data | Binance REST API + WebSocket streams |
+| Economic Data | RapidAPI HorizonFX Economic Calendar |
 | Charts | TradingView Lightweight Charts |
 | Validation | Zod 4 |
 | Data Fetching | TanStack React Query |
@@ -37,18 +40,22 @@ app/
     trade/                  execute-trade, close-position, update-order
     account/                get-account-stats, add-demo-funds, change-password
     favorites.ts            add/remove favorite symbols
+    economic-calendar.ts    server action wrapping fetchEconomicCalendar
   market/                 Main trading dashboard
     _components/
       _symbols/             Symbol list, search, tabs, row
       _primaryContent/
         _chart/               TradingView chart + order panel
         _positionsPanel/      Open/closed positions, account info, edit modal
+      _navbar/
+        _economicCalendar/    Calendar panel, filters, date picker, data hook
       _header/              Dashboard header
   _components/            Headless components (AccountManager, MarketManager)
   api/                    API routes (Binance ticker proxy)
 
 lib/
   binance.ts              Binance REST helpers (ticker, klines)
+  economic-calendar.ts    RapidAPI economic calendar fetch + cache
   config.ts               Constants (spread, leverage, rate limits, URLs)
   trading-math.ts         P&L, margin, liquidation, SL/TP calculations
   rate-limit.ts           In-memory sliding-window rate limiter
@@ -74,7 +81,10 @@ Create a `.env.local` file:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+RAPIDAPI_KEY=your_rapidapi_key
 ```
+
+The `RAPIDAPI_KEY` is required for the Economic Calendar. Get a free key at [rapidapi.com](https://rapidapi.com) and subscribe to the [HorizonFX Economic Calendar API](https://rapidapi.com/yasimpratama88/api/economic-calendar-api) (free tier, no credit card required).
 
 ### Install & Run
 

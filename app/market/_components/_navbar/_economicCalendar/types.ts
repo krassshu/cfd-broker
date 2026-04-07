@@ -31,4 +31,4 @@ export const IMPACT_CONFIG: Record<Impact, { label: string; color: string; bg: s
 
 export const IMPACT_SORT_ORDER: Record<Impact, number> = { high: 3, medium: 2, low: 1 };
 
-export const AUTO_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
+export const AUTO_REFRESH_MS = 10 * 60 * 1000; // 10 minutes (server caches for 30 min)
